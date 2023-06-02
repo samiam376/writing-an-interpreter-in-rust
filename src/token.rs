@@ -1,0 +1,16 @@
+pub enum Token {
+    Illegal,
+    EOF,
+    Ident,
+    Int,
+    Assign,
+    Plus,
+    Comma,
+    SemiColon,
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
+    Function,
+    Let,
+}
