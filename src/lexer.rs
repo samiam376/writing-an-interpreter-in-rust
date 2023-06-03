@@ -63,20 +63,42 @@ impl<'input_string_lifetime> Lexer<'input_string_lifetime> {
         }
     }
 
+    fn peek_char(&self) -> Option<&str> {
+        if self.read_position >= self.input.len() {
+            None
+        } else {
+            Some(self.input[self.read_position])
+        }
+    }
+
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
 
         let token = match self.ch {
             None => Token::EOF,
             Some(c) => match c {
-                "=" => Token::Assign,
+                "=" => {
+                    if self.peek_char() == Some("=") {
+                        self.read_char();
+                        Token::Eq
+                    } else {
+                        Token::Assign
+                    }
+                }
                 ";" => Token::SemiColon,
                 "(" => Token::LParen,
                 ")" => Token::RParen,
                 "," => Token::Comma,
                 "+" => Token::Plus,
                 "-" => Token::Minus,
-                "!" => Token::Bang,
+                "!" => {
+                    if self.peek_char() == Some("=") {
+                        self.read_char();
+                        Token::NotEq
+                    } else {
+                        Token::Bang
+                    }
+                }
                 "*" => Token::Asterisk,
                 "/" => Token::Slash,
                 "<" => Token::Lt,
@@ -136,6 +158,9 @@ mod test {
         } else {
             return false;
         }
+
+        10 == 10;
+        10 != 9;
         ";
 
         let expected_tokens = [
@@ -204,6 +229,14 @@ mod test {
             Token::False,
             Token::SemiColon,
             Token::RBrace,
+            Token::Int("10".to_string()),
+            Token::Eq,
+            Token::Int("10".to_string()),
+            Token::SemiColon,
+            Token::Int("10".to_string()),
+            Token::NotEq,
+            Token::Int("9".to_string()),
+            Token::SemiColon,
             Token::EOF,
         ];
 
