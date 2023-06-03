@@ -75,6 +75,12 @@ impl<'input_string_lifetime> Lexer<'input_string_lifetime> {
                 ")" => Token::RParen,
                 "," => Token::Comma,
                 "+" => Token::Plus,
+                "-" => Token::Minus,
+                "!" => Token::Bang,
+                "*" => Token::Asterisk,
+                "/" => Token::Slash,
+                "<" => Token::Lt,
+                ">" => Token::Gt,
                 "{" => Token::LBrace,
                 "}" => Token::RBrace,
                 t => {
@@ -83,6 +89,11 @@ impl<'input_string_lifetime> Lexer<'input_string_lifetime> {
                         return match ident.as_str() {
                             "fn" => Token::Function,
                             "let" => Token::Let,
+                            "true" => Token::True,
+                            "false" => Token::False,
+                            "if" => Token::If,
+                            "else" => Token::Else,
+                            "return" => Token::Return,
                             _ => Token::Ident(ident),
                         };
                     }
@@ -114,7 +125,18 @@ mod test {
              x + y;
         };
 
-        let result = add(five, ten);";
+        let result = add(five, ten);
+
+        !-/*5;
+        5 < 10 > 5;
+    
+
+        if (5 < 10) {
+            return true;
+        } else {
+            return false;
+        }
+        ";
 
         let expected_tokens = [
             Token::Let,
@@ -153,6 +175,36 @@ mod test {
             Token::Ident("ten".to_string()),
             Token::RParen,
             Token::SemiColon,
+            Token::Bang,
+            Token::Minus,
+            Token::Slash,
+            Token::Asterisk,
+            Token::Int("5".to_string()),
+            Token::SemiColon,
+            Token::Int("5".to_string()),
+            Token::Lt,
+            Token::Int("10".to_string()),
+            Token::Gt,
+            Token::Int("5".to_string()),
+            Token::SemiColon,
+            Token::If,
+            Token::LParen,
+            Token::Int("5".to_string()),
+            Token::Lt,
+            Token::Int("10".to_string()),
+            Token::RParen,
+            Token::LBrace,
+            Token::Return,
+            Token::True,
+            Token::SemiColon,
+            Token::RBrace,
+            Token::Else,
+            Token::LBrace,
+            Token::Return,
+            Token::False,
+            Token::SemiColon,
+            Token::RBrace,
+            Token::EOF,
         ];
 
         let mut lexer = Lexer::new(input);
