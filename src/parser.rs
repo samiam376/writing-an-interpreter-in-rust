@@ -60,10 +60,31 @@ impl<'lexer> Parser<'lexer> {
         })
     }
 
+    fn parse_return_statement(&mut self) -> Result<Statement, String> {
+        self.next_token();
+
+        let expression = match self.cur_token.clone() {
+            Some(token) => match token {
+                Token::Ident(n) => Expression::Identifier(n),
+                Token::Int(n) => Expression::Integer(n.parse().unwrap()),
+                Token::False => Expression::Boolean(false),
+                Token::True => Expression::Boolean(true),
+                _ => return Err(format!("parse error: invalid token for expression")),
+            },
+            _ => return Err(format!("parse error: no token for expression")),
+        };
+
+        while self.cur_token != Some(Token::SemiColon) {
+            self.next_token();
+        }
+
+        Ok(Statement::Return(expression))
+    }
     fn parse_statement(&mut self) -> Result<Statement, String> {
         println!("parse_statement: {:?}", self.cur_token);
         match &self.cur_token {
             Some(Token::Let) => self.parse_let_statement(),
+            Some(Token::Return) => self.parse_return_statement(),
             _ => Err(format!("parse error: unsupported token")),
         }
     }
@@ -122,6 +143,31 @@ mod tests {
 
                     assert_eq!(*value, values[i]);
                 }
+                _ => panic!("stmt is not let statement"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_return_statements() {
+        let input = "
+        return 5;
+        return 10;
+        return 993322;
+        ";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program().expect("parse errors");
+
+        assert_eq!(program.statements.len(), 3);
+
+        for stmt in program.statements {
+            assert_eq!(stmt.token_literal(), "return");
+            match stmt {
+                Statement::Return(_) => (),
+                _ => panic!("stmt is not return statement"),
             }
         }
     }

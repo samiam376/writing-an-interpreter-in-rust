@@ -3,12 +3,17 @@ use crate::token::Token;
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Statement {
     Let { name: String, value: Expression },
+    Return(Expression),
 }
 
 impl Statement {
     pub fn token_literal(&self) -> String {
         match self {
-            Statement::Let { name, value } => Token::Let.literal(),
+            Statement::Let {
+                name: _name,
+                value: _value,
+            } => Token::Let.literal(),
+            Statement::Return(_exp) => Token::Return.literal(),
         }
     }
 }
