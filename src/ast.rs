@@ -97,7 +97,7 @@ impl Display for Expression {
                     s.push_str(&format!("{}", stmt));
                 }
                 if let Some(alt) = alternative {
-                    s.push_str(&format!("else "));
+                    s.push_str("else ");
                     for stmt in alt {
                         s.push_str(&format!("{}", stmt));
                     }
@@ -106,14 +106,14 @@ impl Display for Expression {
             }
             Expression::FunctionLiteral { parameters, body } => {
                 let mut s = String::new();
-                s.push_str(&format!("fn("));
+                s.push_str("fn(");
                 for (i, param) in parameters.iter().enumerate() {
                     s.push_str(&format!("{}", param));
                     if i < parameters.len() - 1 {
                         s.push_str(", ");
                     }
                 }
-                s.push_str(&format!(") "));
+                s.push_str(") ");
                 for stmt in body {
                     s.push_str(&format!("{}", stmt));
                 }
@@ -131,7 +131,7 @@ impl Display for Expression {
                         s.push_str(", ");
                     }
                 }
-                s.push_str(&format!(")"));
+                s.push_str(")");
                 write!(f, "{}", s)
             }
         }

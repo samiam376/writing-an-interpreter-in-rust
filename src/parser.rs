@@ -55,13 +55,13 @@ impl<'lexer> Parser<'lexer> {
     fn cur_precedence(&self) -> Option<Precedence> {
         self.cur_token
             .as_ref()
-            .map(|token| Precedence::from_token(token))
+            .map(Precedence::from_token)
     }
 
     fn peek_precedence(&self) -> Option<Precedence> {
         self.peek_token
             .as_ref()
-            .map(|token| Precedence::from_token(token))
+            .map(Precedence::from_token)
     }
 
     fn parse_let_statement(&mut self) -> Result<Statement, String> {
@@ -72,7 +72,7 @@ impl<'lexer> Parser<'lexer> {
                 self.next_token();
                 name
             }
-            _ => return Err(format!("parse error: invalid tokens for let statement")),
+            _ => return Err("parse error: invalid tokens for let statement".to_string()),
         };
 
         let expression = match self.cur_token.clone() {
@@ -81,9 +81,9 @@ impl<'lexer> Parser<'lexer> {
                 Token::Int(n) => Expression::Integer(n.parse().unwrap()),
                 Token::False => Expression::Boolean(false),
                 Token::True => Expression::Boolean(true),
-                _ => return Err(format!("parse error: invalid token for expression")),
+                _ => return Err("parse error: invalid token for expression".to_string()),
             },
-            _ => return Err(format!("parse error: no token for expression")),
+            _ => return Err("parse error: no token for expression".to_string()),
         };
 
         while self.cur_token != Some(Token::SemiColon) {
@@ -105,9 +105,9 @@ impl<'lexer> Parser<'lexer> {
                 Token::Int(n) => Expression::Integer(n.parse().unwrap()),
                 Token::False => Expression::Boolean(false),
                 Token::True => Expression::Boolean(true),
-                _ => return Err(format!("parse error: invalid token for expression")),
+                _ => return Err("parse error: invalid token for expression".to_string()),
             },
-            _ => return Err(format!("parse error: no token for expression")),
+            _ => return Err("parse error: no token for expression".to_string()),
         };
 
         while self.cur_token != Some(Token::SemiColon) {
@@ -117,7 +117,7 @@ impl<'lexer> Parser<'lexer> {
         Ok(Statement::Return(expression))
     }
 
-    fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression, String> {
+    fn parse_expression(&mut self, _precedence: Precedence) -> Result<Expression, String> {
         todo!()
     }
 
@@ -141,7 +141,7 @@ impl<'lexer> Parser<'lexer> {
                     token
                 )),
             },
-            _ => Err(format!("parse prefix error: no token")),
+            _ => Err("parse prefix error: no token".to_string()),
         }
     }
 
@@ -154,7 +154,7 @@ impl<'lexer> Parser<'lexer> {
                     token
                 )),
             },
-            _ => Err(format!("parse error: no token for identifier")),
+            _ => Err("parse error: no token for identifier".to_string()),
         }
     }
 
