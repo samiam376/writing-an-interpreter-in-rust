@@ -127,6 +127,20 @@ impl<'lexer> Parser<'lexer> {
             && self.peek_precedence().is_some()
             && precedence < self.peek_precedence().unwrap()
         {
+            match &self.peek_token {
+                Some(Token::Plus)
+                | Some(Token::Minus)
+                | Some(Token::Slash)
+                | Some(Token::Asterisk)
+                | Some(Token::Eq)
+                | Some(Token::NotEq)
+                | Some(Token::Lt)
+                | Some(Token::Gt) => {
+                    self.next_token();
+                    left = self.parse_infix(left.clone())?;
+                }
+                _ => return Ok(left),
+            }
             self.next_token();
             left = self.parse_infix(left.clone())?;
         }
