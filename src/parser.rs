@@ -1,6 +1,30 @@
 use crate::ast::{Expression, Program, Statement};
 use crate::lexer::Lexer;
 use crate::token::Token;
+
+#[derive(Debug, Eq, PartialEq, Clone, PartialOrd, Ord)]
+enum Precedence {
+    Lowest,
+    Equals,      // ==
+    LessGreater, // > or <
+    Sum,         // +
+    Product,     // *
+    Prefix,      // -X or !X
+    Call,        // myFunction(X)
+}
+
+impl Precedence {
+    fn from_token(token: &Token) -> Precedence {
+        match token {
+            Token::Eq | Token::NotEq => Precedence::Equals,
+            Token::Lt | Token::Gt => Precedence::LessGreater,
+            Token::Plus | Token::Minus => Precedence::Sum,
+            Token::Slash | Token::Asterisk => Precedence::Product,
+            _ => Precedence::Lowest,
+        }
+    }
+}
+
 pub struct Parser<'lexer> {
     lexer: Lexer<'lexer>,
     cur_token: Option<Token>,
@@ -26,6 +50,18 @@ impl<'lexer> Parser<'lexer> {
     fn next_token(&mut self) {
         self.cur_token = self.peek_token.clone();
         self.peek_token = Some(self.lexer.next_token());
+    }
+
+    fn cur_precedence(&self) -> Option<Precedence> {
+        self.cur_token
+            .as_ref()
+            .map(|token| Precedence::from_token(token))
+    }
+
+    fn peek_precedence(&self) -> Option<Precedence> {
+        self.peek_token
+            .as_ref()
+            .map(|token| Precedence::from_token(token))
     }
 
     fn parse_let_statement(&mut self) -> Result<Statement, String> {
@@ -80,12 +116,57 @@ impl<'lexer> Parser<'lexer> {
 
         Ok(Statement::Return(expression))
     }
+
+    fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression, String> {
+        todo!()
+    }
+
+    fn parse_prefix(&mut self) -> Result<Expression, String> {
+        match &self.cur_token {
+            Some(token) => match token {
+                Token::Ident(_) => self.parse_identifier(),
+                Token::Bang | Token::Minus => {
+                    let operator = token.clone();
+                    self.next_token();
+
+                    let right = self.parse_expression(Precedence::Prefix)?;
+
+                    Ok(Expression::Prefix {
+                        operator,
+                        right: Box::new(right),
+                    })
+                }
+                _ => Err(format!(
+                    "parse error: no parse function for prefix {:?}",
+                    token
+                )),
+            },
+            _ => Err(format!("parse prefix error: no token")),
+        }
+    }
+
+    fn parse_identifier(&mut self) -> Result<Expression, String> {
+        match &self.cur_token {
+            Some(token) => match token {
+                Token::Ident(n) => Ok(Expression::Identifier(n.into())),
+                _ => Err(format!(
+                    "parse identifier error: unexpected token {:?}",
+                    token
+                )),
+            },
+            _ => Err(format!("parse error: no token for identifier")),
+        }
+    }
+
     fn parse_statement(&mut self) -> Result<Statement, String> {
         println!("parse_statement: {:?}", self.cur_token);
         match &self.cur_token {
             Some(Token::Let) => self.parse_let_statement(),
             Some(Token::Return) => self.parse_return_statement(),
-            _ => Err(format!("parse error: unsupported token")),
+            _ => Err(format!(
+                "parse error: unsupported token {:?} for statement",
+                self.cur_token
+            )),
         }
     }
 
@@ -99,7 +180,7 @@ impl<'lexer> Parser<'lexer> {
             self.next_token();
         }
 
-        if self.errors.len() > 0 {
+        if self.errors.is_empty() {
             return Err(self.errors.clone());
         }
 
