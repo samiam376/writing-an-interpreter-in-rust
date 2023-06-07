@@ -131,7 +131,7 @@ impl Display for Expression {
                         s.push_str(", ");
                     }
                 }
-                s.push_str(")");
+                s.push(')');
                 write!(f, "{}", s)
             }
         }

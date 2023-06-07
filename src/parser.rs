@@ -53,15 +53,11 @@ impl<'lexer> Parser<'lexer> {
     }
 
     fn cur_precedence(&self) -> Option<Precedence> {
-        self.cur_token
-            .as_ref()
-            .map(Precedence::from_token)
+        self.cur_token.as_ref().map(Precedence::from_token)
     }
 
     fn peek_precedence(&self) -> Option<Precedence> {
-        self.peek_token
-            .as_ref()
-            .map(Precedence::from_token)
+        self.peek_token.as_ref().map(Precedence::from_token)
     }
 
     fn parse_let_statement(&mut self) -> Result<Statement, String> {
@@ -118,7 +114,9 @@ impl<'lexer> Parser<'lexer> {
     }
 
     fn parse_expression(&mut self, _precedence: Precedence) -> Result<Expression, String> {
-        todo!()
+        let prefix = self.parse_prefix()?;
+
+        Ok(prefix)
     }
 
     fn parse_prefix(&mut self) -> Result<Expression, String> {
@@ -159,7 +157,6 @@ impl<'lexer> Parser<'lexer> {
     }
 
     fn parse_statement(&mut self) -> Result<Statement, String> {
-        println!("parse_statement: {:?}", self.cur_token);
         match &self.cur_token {
             Some(Token::Let) => self.parse_let_statement(),
             Some(Token::Return) => self.parse_return_statement(),
@@ -180,7 +177,7 @@ impl<'lexer> Parser<'lexer> {
             self.next_token();
         }
 
-        if self.errors.is_empty() {
+        if !self.errors.is_empty() {
             return Err(self.errors.clone());
         }
 
@@ -190,6 +187,8 @@ impl<'lexer> Parser<'lexer> {
 
 #[cfg(test)]
 mod tests {
+    use core::panic;
+
     use crate::ast::Statement;
 
     use super::*;
@@ -205,7 +204,12 @@ mod tests {
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
 
-        let program = parser.parse_program().unwrap();
+        let parsed = parser.parse_program();
+        if parsed.is_err() {
+            panic!("parse error: {:?}", parsed.err());
+        }
+
+        let program = parsed.unwrap();
         assert_eq!(program.statements.len(), 3);
 
         let tests = vec!["x", "y", "foobar"];
