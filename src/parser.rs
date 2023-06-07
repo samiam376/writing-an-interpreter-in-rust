@@ -92,19 +92,25 @@ impl<'lexer> Parser<'lexer> {
         })
     }
 
+    fn parse_integer_literal(&mut self) -> Result<Expression, String> {
+        match self.cur_token.clone() {
+            Some(Token::Int(n)) => Ok(Expression::Integer(n.parse().unwrap())),
+            _ => Err("parse error: invalid token for integer literal".to_string()),
+        }
+    }
+
+    fn parse_boolean_literal(&mut self) -> Result<Expression, String> {
+        match self.cur_token.clone() {
+            Some(Token::True) => Ok(Expression::Boolean(true)),
+            Some(Token::False) => Ok(Expression::Boolean(false)),
+            _ => Err("parse error: invalid token for boolean literal".to_string()),
+        }
+    }
+
     fn parse_return_statement(&mut self) -> Result<Statement, String> {
         self.next_token();
 
-        let expression = match self.cur_token.clone() {
-            Some(token) => match token {
-                Token::Ident(n) => Expression::Identifier(n),
-                Token::Int(n) => Expression::Integer(n.parse().unwrap()),
-                Token::False => Expression::Boolean(false),
-                Token::True => Expression::Boolean(true),
-                _ => return Err("parse error: invalid token for expression".to_string()),
-            },
-            _ => return Err("parse error: no token for expression".to_string()),
-        };
+        let expression = self.parse_expression(Precedence::Lowest)?;
 
         while self.cur_token != Some(Token::SemiColon) {
             self.next_token();
@@ -113,10 +119,19 @@ impl<'lexer> Parser<'lexer> {
         Ok(Statement::Return(expression))
     }
 
-    fn parse_expression(&mut self, _precedence: Precedence) -> Result<Expression, String> {
+    fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression, String> {
         let prefix = self.parse_prefix()?;
 
-        Ok(prefix)
+        let mut left = prefix;
+        while self.peek_token != Some(Token::SemiColon)
+            && self.peek_precedence().is_some()
+            && precedence < self.peek_precedence().unwrap()
+        {
+            self.next_token();
+            left = self.parse_infix(left.clone())?;
+        }
+
+        Ok(left)
     }
 
     fn parse_prefix(&mut self) -> Result<Expression, String> {
@@ -134,6 +149,8 @@ impl<'lexer> Parser<'lexer> {
                         right: Box::new(right),
                     })
                 }
+                Token::Int(_) => self.parse_integer_literal(),
+                Token::True | Token::False => self.parse_boolean_literal(),
                 _ => Err(format!(
                     "parse error: no parse function for prefix {:?}",
                     token
@@ -143,6 +160,26 @@ impl<'lexer> Parser<'lexer> {
         }
     }
 
+    fn parse_infix(&mut self, left: Expression) -> Result<Expression, String> {
+        let precedence = self
+            .cur_precedence()
+            .ok_or("parse infix error: no precedence".to_string())?;
+
+        let cur_token = self
+            .cur_token
+            .clone()
+            .ok_or("parse infix error: no current token".to_string())?;
+
+        self.next_token();
+
+        let right = self.parse_expression(precedence)?;
+
+        Ok(Expression::Infix {
+            left: Box::new(left),
+            operator: cur_token,
+            right: Box::new(right),
+        })
+    }
     fn parse_identifier(&mut self) -> Result<Expression, String> {
         match &self.cur_token {
             Some(token) => match token {
@@ -156,10 +193,21 @@ impl<'lexer> Parser<'lexer> {
         }
     }
 
+    fn parse_expression_statement(&mut self) -> Result<Statement, String> {
+        let expression = self.parse_expression(Precedence::Lowest)?;
+
+        if self.peek_token == Some(Token::SemiColon) {
+            self.next_token();
+        }
+
+        Ok(Statement::Expression(expression))
+    }
+
     fn parse_statement(&mut self) -> Result<Statement, String> {
         match &self.cur_token {
             Some(Token::Let) => self.parse_let_statement(),
             Some(Token::Return) => self.parse_return_statement(),
+            Some(_) => self.parse_expression_statement(),
             _ => Err(format!(
                 "parse error: unsupported token {:?} for statement",
                 self.cur_token
@@ -254,6 +302,52 @@ mod tests {
                 Statement::Return(_) => (),
                 _ => panic!("stmt is not return statement"),
             }
+        }
+    }
+
+    #[test]
+    fn test_prefix_expression() {
+        let input = "
+        !5;
+        -15;
+        ";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program().expect("parse errors");
+
+        assert_eq!(program.statements.len(), 2);
+        let stmt_one = &program.statements[0];
+
+        match stmt_one {
+            Statement::Expression(expr) => match expr {
+                Expression::Prefix { operator, right } => {
+                    assert_eq!(*operator, Token::Bang);
+                    match **right {
+                        Expression::Integer(n) => assert_eq!(n, 5),
+                        _ => panic!("right is not integer"),
+                    }
+                }
+                _ => panic!("stmt is not prefix expression"),
+            },
+            _ => panic!("stmt is not expression statement"),
+        }
+
+        let stmt_two = &program.statements[1];
+
+        match stmt_two {
+            Statement::Expression(expr) => match expr {
+                Expression::Prefix { operator, right } => {
+                    assert_eq!(*operator, Token::Minus);
+                    match **right {
+                        Expression::Integer(n) => assert_eq!(n, 15),
+                        _ => panic!("right is not integer"),
+                    }
+                }
+                _ => panic!("stmt is not prefix expression"),
+            },
+            _ => panic!("stmt is not expression statement"),
         }
     }
 }
