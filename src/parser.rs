@@ -1,3 +1,5 @@
+use std::fmt::format;
+
 use crate::ast::{Expression, Program, Statement};
 use crate::lexer::Lexer;
 use crate::token::Token;
@@ -162,6 +164,16 @@ impl<'lexer> Parser<'lexer> {
                 }
                 Token::Int(_) => self.parse_integer_literal(),
                 Token::True | Token::False => self.parse_boolean_literal(),
+                Token::LParen => {
+                    self.next_token();
+                    let expression = self.parse_expression(Precedence::Lowest)?;
+                    if self.peek_token != Some(Token::RParen) {
+                        return Err("parse error: no closing parenthesis".to_string());
+                    }
+                    self.next_token();
+                    Ok(expression)
+                }
+                Token::If => self.parse_if_expression(),
                 _ => Err(format!(
                     "parse error: no parse function for prefix {:?}",
                     token
@@ -191,6 +203,7 @@ impl<'lexer> Parser<'lexer> {
             right: Box::new(right),
         })
     }
+
     fn parse_identifier(&mut self) -> Result<Expression, String> {
         match &self.cur_token {
             Some(token) => match token {
@@ -202,6 +215,67 @@ impl<'lexer> Parser<'lexer> {
             },
             _ => Err("parse error: no token for identifier".to_string()),
         }
+    }
+
+    fn parse_block_statement(&mut self) -> Result<Vec<Statement>, String> {
+        let mut statements = Vec::new();
+
+        while self.cur_token != Some(Token::RBrace) && self.cur_token != Some(Token::EOF) {
+            let stmt = self.parse_statement()?;
+            statements.push(stmt);
+            self.next_token();
+        }
+
+        Ok(statements)
+    }
+
+    fn parse_if_expression(&mut self) -> Result<Expression, String> {
+        if self.peek_token != Some(Token::LParen) {
+            return Err("parse error: no opening parenthesis for if expression".to_string());
+        };
+
+        self.next_token();
+
+        let condition = self.parse_expression(Precedence::Lowest)?;
+
+        if self.cur_token != Some(Token::RParen) {
+            return Err(format!(
+                "parse error: no closing parenthesis for if expression, got {:?}",
+                self.peek_token
+            ));
+        };
+
+        self.next_token();
+
+        if self.cur_token != Some(Token::LBrace) {
+            return Err(format!(
+                "parse error: no opening brace for if expression, got {:?}",
+                self.peek_token
+            ));
+        };
+
+        self.next_token();
+
+        let consequence = self.parse_block_statement()?;
+
+        let mut alternative = None;
+        if self.peek_token == Some(Token::Else) {
+            self.next_token();
+
+            if self.cur_token != Some(Token::LBrace) {
+                return Err("parse error: no opening brace for else expression".to_string());
+            };
+
+            self.next_token();
+
+            alternative = Some(self.parse_block_statement()?);
+        }
+
+        Ok(Expression::If {
+            condition: Box::new(condition),
+            consequence,
+            alternative,
+        })
     }
 
     fn parse_expression_statement(&mut self) -> Result<Statement, String> {
@@ -379,19 +453,55 @@ mod tests {
                 "3 + 4 * 5 == 3 * 1 + 4 * 5",
                 "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
             ),
+            ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+            ("(5 + 5) * 2", "((5 + 5) * 2)"),
+            ("2 / (5 + 5)", "(2 / (5 + 5))"),
+            ("-(5 + 5)", "(-(5 + 5))"),
+            ("!(true == true)", "(!(true == true))"),
         ];
 
         for (input, expected) in tests.iter() {
             let lexer = Lexer::new(input);
             let mut parser = Parser::new(lexer);
 
-            let program = parser
-                .parse_program()
-                .unwrap_or_else(|_| panic!("parse errors for test: {}", input));
+            let program = parser.parse_program().unwrap_or_else(|e| {
+                panic!("parse errors for test: {} \n Parse Error: {:?}", input, e)
+            });
 
             let actual = program.to_string();
 
             assert_eq!(actual, *expected);
+        }
+    }
+
+    #[test]
+    fn test_if_expression() {
+        let input = "if (x < y) { x }";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program().expect("parse errors");
+
+        assert_eq!(program.statements.len(), 1);
+
+        let stmt = &program.statements[0];
+
+        match stmt {
+            Statement::Expression(expr) => match expr {
+                Expression::If {
+                    condition,
+                    consequence,
+                    alternative,
+                } => {
+                    assert_eq!(condition.to_string(), "(x < y)");
+                    assert_eq!(consequence.len(), 1);
+                    assert_eq!(consequence[0].to_string(), "x");
+                    assert!(alternative.is_none());
+                }
+                _ => panic!("stmt is not if expression"),
+            },
+            _ => panic!("stmt is not expression statement"),
         }
     }
 }
