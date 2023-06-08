@@ -143,6 +143,16 @@ pub struct Program {
     pub statements: Vec<Statement>,
 }
 
+impl Display for Program {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = String::new();
+        for stmt in &self.statements {
+            s.push_str(&format!("{}", stmt));
+        }
+        write!(f, "{}", s)
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Node {
     Statement(Statement),

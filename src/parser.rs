@@ -141,10 +141,7 @@ impl<'lexer> Parser<'lexer> {
                 }
                 _ => return Ok(left),
             }
-            self.next_token();
-            left = self.parse_infix(left.clone())?;
         }
-
         Ok(left)
     }
 
@@ -362,6 +359,39 @@ mod tests {
                 _ => panic!("stmt is not prefix expression"),
             },
             _ => panic!("stmt is not expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_operator_precedence() {
+        let tests = [
+            ("!-a", "(!(-a))"),
+            ("a + b + c", "((a + b) + c)"),
+            ("a + b - c", "((a + b) - c)"),
+            ("a * b * c", "((a * b) * c)"),
+            ("a * b / c", "((a * b) / c)"),
+            ("a + b / c", "(a + (b / c))"),
+            ("a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f)"),
+            ("3 + 4; -5 * 5", "(3 + 4)((-5) * 5)"),
+            ("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"),
+            ("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"),
+            (
+                "3 + 4 * 5 == 3 * 1 + 4 * 5",
+                "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+            ),
+        ];
+
+        for (input, expected) in tests.iter() {
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+
+            let program = parser
+                .parse_program()
+                .unwrap_or_else(|_| panic!("parse errors for test: {}", input));
+
+            let actual = program.to_string();
+
+            assert_eq!(actual, *expected);
         }
     }
 }
