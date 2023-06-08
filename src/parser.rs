@@ -218,6 +218,7 @@ impl<'lexer> Parser<'lexer> {
     }
 
     fn parse_block_statement(&mut self) -> Result<Vec<Statement>, String> {
+        self.next_token();
         let mut statements = Vec::new();
 
         while self.cur_token != Some(Token::RBrace) && self.cur_token != Some(Token::EOF) {
@@ -250,11 +251,9 @@ impl<'lexer> Parser<'lexer> {
         if self.cur_token != Some(Token::LBrace) {
             return Err(format!(
                 "parse error: no opening brace for if expression, got {:?}",
-                self.peek_token
+                self.cur_token
             ));
         };
-
-        self.next_token();
 
         let consequence = self.parse_block_statement()?;
 
@@ -262,8 +261,11 @@ impl<'lexer> Parser<'lexer> {
         if self.peek_token == Some(Token::Else) {
             self.next_token();
 
-            if self.cur_token != Some(Token::LBrace) {
-                return Err("parse error: no opening brace for else expression".to_string());
+            if self.peek_token != Some(Token::LBrace) {
+                return Err(format!(
+                    "parse error: no opening brace for else expression, got {:?}",
+                    self.peek_token
+                ));
             };
 
             self.next_token();
@@ -498,6 +500,40 @@ mod tests {
                     assert_eq!(consequence.len(), 1);
                     assert_eq!(consequence[0].to_string(), "x");
                     assert!(alternative.is_none());
+                }
+                _ => panic!("stmt is not if expression"),
+            },
+            _ => panic!("stmt is not expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_if_else_expression() {
+        let input = "if (x < y) { x } else { y }";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program().expect("parse errors");
+
+        assert_eq!(program.statements.len(), 1);
+
+        let stmt = &program.statements[0];
+
+        match stmt {
+            Statement::Expression(expr) => match expr {
+                Expression::If {
+                    condition,
+                    consequence,
+                    alternative,
+                } => {
+                    assert_eq!(condition.to_string(), "(x < y)");
+                    assert_eq!(consequence.len(), 1);
+                    assert_eq!(consequence[0].to_string(), "x");
+                    assert!(alternative.is_some());
+                    let alternative = alternative.as_ref().unwrap();
+                    assert_eq!(alternative.len(), 1);
+                    assert_eq!(alternative[0].to_string(), "y");
                 }
                 _ => panic!("stmt is not if expression"),
             },
