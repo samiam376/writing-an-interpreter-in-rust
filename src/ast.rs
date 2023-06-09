@@ -2,7 +2,9 @@ use std::fmt::Display;
 
 use crate::token::Token;
 
-type Block = Vec<Statement>;
+pub type Block = Vec<Statement>;
+
+pub type Identifier = String;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Statement {
@@ -45,7 +47,7 @@ impl Statement {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Expression {
-    Identifier(String),
+    Identifier(Identifier),
     Integer(i64),
     Boolean(bool),
     Prefix {
@@ -63,7 +65,7 @@ pub enum Expression {
         alternative: Option<Block>,
     },
     FunctionLiteral {
-        parameters: Vec<Token>,
+        parameters: Vec<Identifier>,
         body: Block,
     },
     Call {

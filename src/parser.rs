@@ -1,6 +1,4 @@
-use std::fmt::format;
-
-use crate::ast::{Expression, Program, Statement};
+use crate::ast::{Expression, Identifier, Program, Statement};
 use crate::lexer::Lexer;
 use crate::token::Token;
 
@@ -147,6 +145,81 @@ impl<'lexer> Parser<'lexer> {
         Ok(left)
     }
 
+    fn parse_function_parameters(&mut self) -> Result<Vec<Identifier>, String> {
+        let mut identifiers = Vec::new();
+
+        if self.peek_token == Some(Token::RParen) {
+            self.next_token();
+            return Ok(identifiers);
+        };
+
+        self.next_token();
+
+        let identifier = self
+            .cur_token
+            .clone()
+            .map(|token| token.literal())
+            .ok_or(format!(
+                "parse error: expected identifier, got {:?}",
+                self.cur_token,
+            ))?;
+
+        identifiers.push(identifier);
+
+        while self.peek_token == Some(Token::Comma) {
+            self.next_token();
+            self.next_token();
+
+            let identifier = self
+                .cur_token
+                .clone()
+                .map(|token| token.literal())
+                .ok_or(format!(
+                    "parse error: expected identifier, got {:?}",
+                    self.cur_token,
+                ))?;
+
+            identifiers.push(identifier);
+        }
+
+        if self.peek_token != Some(Token::RParen) {
+            return Err(format!(
+                "parse error: expected ), got {:?}",
+                self.peek_token
+            ));
+        }
+
+        self.next_token();
+
+        Ok(identifiers)
+    }
+
+    fn parse_function_literal(&mut self) -> Result<Expression, String> {
+        if self.peek_token != Some(Token::LParen) {
+            return Err(format!(
+                "parse error: expected (, got {:?}",
+                self.peek_token
+            ));
+        };
+
+        self.next_token();
+
+        let parameters = self.parse_function_parameters()?;
+
+        if self.peek_token != Some(Token::LBrace) {
+            return Err(format!(
+                "parse error: expected {{, got {:?}",
+                self.peek_token
+            ));
+        };
+
+        self.next_token();
+
+        let body = self.parse_block_statement()?;
+
+        Ok(Expression::FunctionLiteral { parameters, body })
+    }
+
     fn parse_prefix(&mut self) -> Result<Expression, String> {
         match &self.cur_token {
             Some(token) => match token {
@@ -174,6 +247,7 @@ impl<'lexer> Parser<'lexer> {
                     Ok(expression)
                 }
                 Token::If => self.parse_if_expression(),
+                Token::Function => self.parse_function_literal(),
                 _ => Err(format!(
                     "parse error: no parse function for prefix {:?}",
                     token
@@ -536,6 +610,37 @@ mod tests {
                     assert_eq!(alternative[0].to_string(), "y");
                 }
                 _ => panic!("stmt is not if expression"),
+            },
+            _ => panic!("stmt is not expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_function_literal() {
+        let input = "fn(x, y) { x + y; }";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser
+            .parse_program()
+            .unwrap_or_else(|e| panic!("parse errors for test: {} \n Parse Error: {:?}", input, e));
+
+        assert_eq!(program.statements.len(), 1);
+
+        let stmt = &program.statements[0];
+
+        match stmt {
+            Statement::Expression(expr) => match expr {
+                Expression::FunctionLiteral { parameters, body } => {
+                    assert_eq!(parameters.len(), 2);
+                    assert_eq!(parameters[0].to_string(), "x");
+                    assert_eq!(parameters[1].to_string(), "y");
+
+                    assert_eq!(body.len(), 1);
+                    assert_eq!(body[0].to_string(), "(x + y)");
+                }
+                _ => panic!("stmt is not function literal"),
             },
             _ => panic!("stmt is not expression statement"),
         }
