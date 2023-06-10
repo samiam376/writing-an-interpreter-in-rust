@@ -20,6 +20,7 @@ impl Precedence {
             Token::Lt | Token::Gt => Precedence::LessGreater,
             Token::Plus | Token::Minus => Precedence::Sum,
             Token::Slash | Token::Asterisk => Precedence::Product,
+            Token::LParen => Precedence::Call,
             _ => Precedence::Lowest,
         }
     }
@@ -138,6 +139,10 @@ impl<'lexer> Parser<'lexer> {
                 | Some(Token::Gt) => {
                     self.next_token();
                     left = self.parse_infix(left.clone())?;
+                }
+                Some(Token::LParen) => {
+                    self.next_token();
+                    left = self.parse_call_expression(left.clone())?;
                 }
                 _ => return Ok(left),
             }
@@ -354,6 +359,44 @@ impl<'lexer> Parser<'lexer> {
         })
     }
 
+    fn parse_call_expression(&mut self, function: Expression) -> Result<Expression, String> {
+        let args = self.parse_call_arguments()?;
+
+        Ok(Expression::Call {
+            function: Box::new(function),
+            arguments: args,
+        })
+    }
+
+    fn parse_call_arguments(&mut self) -> Result<Vec<Expression>, String> {
+        let mut args = Vec::new();
+
+        if self.peek_token == Some(Token::RParen) {
+            self.next_token();
+            return Ok(args);
+        };
+
+        self.next_token();
+        args.push(self.parse_expression(Precedence::Lowest)?);
+
+        while self.peek_token == Some(Token::Comma) {
+            self.next_token();
+            self.next_token();
+
+            args.push(self.parse_expression(Precedence::Lowest)?);
+        }
+
+        if self.peek_token != Some(Token::RParen) {
+            return Err(format!(
+                "parse error: no closing parenthesis for call expression, got {:?}",
+                self.peek_token
+            ));
+        };
+
+        self.next_token();
+
+        Ok(args)
+    }
     fn parse_expression_statement(&mut self) -> Result<Statement, String> {
         let expression = self.parse_expression(Precedence::Lowest)?;
 
@@ -644,5 +687,23 @@ mod tests {
             },
             _ => panic!("stmt is not expression statement"),
         }
+    }
+
+    #[test]
+    fn test_call_expression() {
+        let input = "add(1, 2 * 3, 4 + 5);";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser
+            .parse_program()
+            .unwrap_or_else(|e| panic!("parse errors for test: {} \n Parse Error: {:?}", input, e));
+
+        assert_eq!(program.statements.len(), 1);
+
+        let stmt = &program.statements[0];
+
+        assert_eq!(stmt.to_string(), "add(1, (2 * 3), (4 + 5))");
     }
 }
