@@ -110,7 +110,7 @@ impl Display for Expression {
                 let mut s = String::new();
                 s.push_str("fn(");
                 for (i, param) in parameters.iter().enumerate() {
-                    s.push_str(&format!("{}", param));
+                    s.push_str(&param.to_string());
                     if i < parameters.len() - 1 {
                         s.push_str(", ");
                     }
