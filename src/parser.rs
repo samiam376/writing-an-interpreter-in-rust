@@ -72,18 +72,9 @@ impl<'lexer> Parser<'lexer> {
             _ => return Err("parse error: invalid tokens for let statement".to_string()),
         };
 
-        let expression = match self.cur_token.clone() {
-            Some(token) => match token {
-                Token::Ident(n) => Expression::Identifier(n),
-                Token::Int(n) => Expression::Integer(n.parse().unwrap()),
-                Token::False => Expression::Boolean(false),
-                Token::True => Expression::Boolean(true),
-                _ => return Err("parse error: invalid token for expression".to_string()),
-            },
-            _ => return Err("parse error: no token for expression".to_string()),
-        };
+        let expression = self.parse_expression(Precedence::Lowest)?;
 
-        while self.cur_token != Some(Token::SemiColon) {
+        if self.peek_token == Some(Token::SemiColon) {
             self.next_token();
         }
 
@@ -113,7 +104,7 @@ impl<'lexer> Parser<'lexer> {
 
         let expression = self.parse_expression(Precedence::Lowest)?;
 
-        while self.cur_token != Some(Token::SemiColon) {
+        if self.peek_token == Some(Token::SemiColon) {
             self.next_token();
         }
 
