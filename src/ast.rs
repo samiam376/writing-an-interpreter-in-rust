@@ -157,6 +157,7 @@ impl Display for Program {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Node {
+    Program(Program),
     Statement(Statement),
     Expression(Expression),
 }
