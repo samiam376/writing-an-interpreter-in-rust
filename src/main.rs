@@ -1,6 +1,8 @@
 use std::io::Write;
 
-use writing_an_interpreter_in_rust::{ast::Node, evaluator::eval, lexer::Lexer, parser::Parser};
+use writing_an_interpreter_in_rust::{
+    ast::Node, evaluator::eval, lexer::Lexer, object::Environment, parser::Parser,
+};
 
 const PROMPT: &str = ">> ";
 
@@ -30,9 +32,11 @@ fn main() {
         let mut parser = Parser::new(lexer);
 
         let program = parser.parse_program();
+
         match program {
             Ok(program) => {
-                let evaluated = eval(Node::Program(program));
+                let mut env = Environment::new();
+                let evaluated = eval(Node::Program(program), &env);
                 match evaluated {
                     Ok(evaluated) => println!("{}", evaluated),
                     Err(error) => println!("{}", error),

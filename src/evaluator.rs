@@ -1,6 +1,6 @@
 use crate::{
     ast::{Block, Expression, IfExpression, Node, Program, Statement},
-    object::Object,
+    object::{Environment, Object},
     token::Token,
 };
 
@@ -61,22 +61,22 @@ fn eval_infix(operator: Token, right: Object, left: Object) -> Result<Object, St
     }
 }
 
-fn eval_if_expression(ie: IfExpression) -> Result<Object, String> {
-    let condition = eval((*ie.condition).into())?;
+fn eval_if_expression(ie: IfExpression, mut env: &Environment) -> Result<Object, String> {
+    let condition = eval((*ie.condition).into(), env)?;
 
     if condition.is_truthy() {
-        eval(ie.consequence.into())
+        eval(ie.consequence.into(), env)
     } else if let Some(alt) = ie.alternative {
-        eval(alt.into())
+        eval(alt.into(), env)
     } else {
         Ok(Object::Null)
     }
 }
-fn eval_block(block: Block) -> Result<Object, String> {
+fn eval_block(block: Block, mut env: &Environment) -> Result<Object, String> {
     let mut result = Object::Null;
 
     for statement in block {
-        result = eval(statement.into())?;
+        result = eval(statement.into(), env)?;
 
         if result.is_return_value() {
             return Ok(result);
@@ -86,10 +86,10 @@ fn eval_block(block: Block) -> Result<Object, String> {
     Ok(result)
 }
 
-fn eval_program(program: Program) -> Result<Object, String> {
+fn eval_program(program: Program, mut env: &Environment) -> Result<Object, String> {
     let mut result = Object::Null;
     for statement in program.statements {
-        result = eval(statement.into())?;
+        result = eval(statement.into(), env)?;
         if let Object::ReturnValue(value) = result {
             return Ok(*value);
         }
@@ -97,24 +97,24 @@ fn eval_program(program: Program) -> Result<Object, String> {
     Ok(result)
 }
 
-fn eval_statement(statement: Statement) -> Result<Object, String> {
+fn eval_statement(statement: Statement, mut env: &Environment) -> Result<Object, String> {
     match statement {
-        Statement::Expression(expression) => eval(expression.into()),
-        Statement::Block(block) => eval_block(block),
+        Statement::Expression(expression) => eval(expression.into(), env),
+        Statement::Block(block) => eval_block(block, env),
         Statement::Return(expression) => {
-            let val = eval(expression.into())?;
+            let val = eval(expression.into(), env)?;
             Ok(Object::ReturnValue(Box::new(val)))
         }
         _ => Err(format!("unimplemented: {:?}", statement)),
     }
 }
 
-fn eval_expression(expression: Expression) -> Result<Object, String> {
+fn eval_expression(expression: Expression, mut env: &Environment) -> Result<Object, String> {
     match expression {
         Expression::Boolean(bool) => Ok(Object::Boolean(bool)),
         Expression::Integer(i) => Ok(Object::Integer(i)),
         Expression::Prefix { operator, right } => {
-            let right = eval_expression(*right)?;
+            let right = eval_expression(*right, env)?;
             eval_prefix(operator, right)
         }
         Expression::Infix {
@@ -122,20 +122,20 @@ fn eval_expression(expression: Expression) -> Result<Object, String> {
             operator,
             right,
         } => {
-            let left = eval_expression(*left)?;
-            let right = eval_expression(*right)?;
+            let left = eval_expression(*left, env)?;
+            let right = eval_expression(*right, env)?;
             eval_infix(operator, right, left)
         }
-        Expression::If(ie) => eval_if_expression(ie),
+        Expression::If(ie) => eval_if_expression(ie, env),
         _ => Err(format!("unimplemented: {:?}", expression)),
     }
 }
 
-pub fn eval(node: Node) -> Result<Object, String> {
+pub fn eval(node: Node, mut env: &Environment) -> Result<Object, String> {
     match node {
-        Node::Program(p) => eval_program(p),
-        Node::Statement(s) => eval_statement(s),
-        Node::Expression(exp) => eval_expression(exp),
+        Node::Program(p) => eval_program(p, env),
+        Node::Statement(s) => eval_statement(s, env),
+        Node::Expression(exp) => eval_expression(exp, env),
     }
 }
 
@@ -149,7 +149,9 @@ mod test {
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program().unwrap();
 
-        eval(Node::Program(program)).unwrap_or_else(|e| {
+        let mut env = Environment::new();
+
+        eval(program.into(), &env).unwrap_or_else(|e| {
             panic!("eval error: {}", e);
         })
     }
