@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Expression, IfExpression, Node, Program, Statement},
+    ast::{Block, Expression, IfExpression, Node, Program, Statement},
     object::Object,
     token::Token,
 };
@@ -50,42 +50,61 @@ fn eval_infix_boolean(operator: Token, right: bool, left: bool) -> Result<Object
 }
 
 fn eval_infix(operator: Token, right: Object, left: Object) -> Result<Object, String> {
-    match (left, right) {
+    match (&left, &right) {
         (Object::Integer(left), Object::Integer(right)) => {
-            eval_infix_integer(operator, right, left)
+            eval_infix_integer(operator, *right, *left)
         }
         (Object::Boolean(left), Object::Boolean(right)) => {
-            eval_infix_boolean(operator, right, left)
+            eval_infix_boolean(operator, *right, *left)
         }
         _ => Err(format!("unknown operator: {} {} {}", left, operator, right)),
     }
 }
 
 fn eval_if_expression(ie: IfExpression) -> Result<Object, String> {
-    let condition = eval(Node::Expression(*ie.condition))?;
+    let condition = eval((*ie.condition).into())?;
 
     if condition.is_truthy() {
-        eval(Node::Program(Program {
-            statements: ie.consequence,
-        }))
+        eval(ie.consequence.into())
     } else if let Some(alt) = ie.alternative {
-        eval(Node::Program(Program { statements: alt }))
+        eval(alt.into())
     } else {
         Ok(Object::Null)
     }
+}
+fn eval_block(block: Block) -> Result<Object, String> {
+    let mut result = Object::Null;
+
+    for statement in block {
+        result = eval(statement.into())?;
+
+        if result.is_return_value() {
+            return Ok(result);
+        }
+    }
+
+    Ok(result)
 }
 
 fn eval_program(program: Program) -> Result<Object, String> {
     let mut result = Object::Null;
     for statement in program.statements {
-        result = eval(Node::Statement(statement))?;
+        result = eval(statement.into())?;
+        if let Object::ReturnValue(value) = result {
+            return Ok(*value);
+        }
     }
     Ok(result)
 }
 
 fn eval_statement(statement: Statement) -> Result<Object, String> {
     match statement {
-        Statement::Expression(expression) => eval(Node::Expression(expression)),
+        Statement::Expression(expression) => eval(expression.into()),
+        Statement::Block(block) => eval_block(block),
+        Statement::Return(expression) => {
+            let val = eval(expression.into())?;
+            Ok(Object::ReturnValue(Box::new(val)))
+        }
         _ => Err(format!("unimplemented: {:?}", statement)),
     }
 }
@@ -221,6 +240,23 @@ mod test {
         );
         assert_eq!(
             run_eval("if (1 < 2) { 10 } else { 20 }"),
+            Object::Integer(10)
+        );
+    }
+
+    #[test]
+    fn test_return_statements() {
+        assert_eq!(run_eval("return 10;"), Object::Integer(10));
+        assert_eq!(run_eval("return 10; 9;"), Object::Integer(10));
+        assert_eq!(
+            run_eval(
+                "if (10 > 1) {
+                    if (10 > 1) {
+                        return 10;
+                    }
+                    return 1; 
+                }",
+            ),
             Object::Integer(10)
         );
     }

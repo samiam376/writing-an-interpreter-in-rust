@@ -159,3 +159,27 @@ pub enum Node {
     Statement(Statement),
     Expression(Expression),
 }
+
+impl From<Expression> for Node {
+    fn from(exp: Expression) -> Self {
+        Node::Expression(exp)
+    }
+}
+
+impl From<Statement> for Node {
+    fn from(stmt: Statement) -> Self {
+        Node::Statement(stmt)
+    }
+}
+
+impl From<Program> for Node {
+    fn from(prog: Program) -> Self {
+        Node::Program(prog)
+    }
+}
+
+impl From<Block> for Node {
+    fn from(block: Block) -> Self {
+        Node::Statement(Statement::Block(block))
+    }
+}
