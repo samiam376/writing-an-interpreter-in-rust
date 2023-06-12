@@ -4,44 +4,46 @@ use crate::{
     token::Token,
 };
 
-fn eval_bang(object: Object) -> Result<Object, String> {
+type EvalReturn = Result<Option<Object>, String>;
+
+fn eval_bang(object: Object) -> EvalReturn {
     match object {
-        Object::Boolean(bool) => Ok(Object::Boolean(!bool)),
-        Object::Null => Ok(Object::Boolean(true)),
-        _ => Ok(Object::Boolean(false)),
+        Object::Boolean(bool) => Ok(Some(Object::Boolean(!bool))),
+        Object::Null => Ok(Some(Object::Boolean(true))),
+        _ => Ok(Some(Object::Boolean(false))),
     }
 }
 
-fn eval_minus_prefix(right: Object) -> Result<Object, String> {
+fn eval_minus_prefix(right: Object) -> EvalReturn {
     match right {
-        Object::Integer(i) => Ok(Object::Integer(-i)),
+        Object::Integer(i) => Ok(Some(Object::Integer(-i))),
         _ => Err(format!("unknown operator: -{}", right)),
     }
 }
 
-fn eval_prefix(operator: Token, right: Object) -> Result<Object, String> {
+fn eval_prefix(operator: Token, right: Object) -> EvalReturn {
     match operator {
         Token::Bang => eval_bang(right),
         Token::Minus => eval_minus_prefix(right),
-        _ => Ok(Object::Null),
+        _ => Ok(Some(Object::Null)),
     }
 }
 
-fn eval_infix_integer(operator: Token, right: i64, left: i64) -> Result<Object, String> {
+fn eval_infix_integer(operator: Token, right: i64, left: i64) -> EvalReturn {
     match operator {
-        Token::Plus => Ok(Object::Integer(left + right)),
-        Token::Minus => Ok(Object::Integer(left - right)),
-        Token::Asterisk => Ok(Object::Integer(left * right)),
-        Token::Slash => Ok(Object::Integer(left / right)),
-        Token::Lt => Ok(Object::Boolean(left < right)),
-        Token::Gt => Ok(Object::Boolean(left > right)),
+        Token::Plus => Ok(Some(Object::Integer(left + right))),
+        Token::Minus => Ok(Some(Object::Integer(left - right))),
+        Token::Asterisk => Ok(Some(Object::Integer(left * right))),
+        Token::Slash => Ok(Some(Object::Integer(left / right))),
+        Token::Lt => Ok(Some(Object::Boolean(left < right))),
+        Token::Gt => Ok(Some(Object::Boolean(left > right))),
         Token::Eq => Ok(Object::Boolean(left == right)),
         Token::NotEq => Ok(Object::Boolean(left != right)),
         _ => Err(format!("unknown operator: {} {} {}", left, operator, right)),
     }
 }
 
-fn eval_infix_boolean(operator: Token, right: bool, left: bool) -> Result<Object, String> {
+fn eval_infix_boolean(operator: Token, right: bool, left: bool) -> EvalReturn {
     match operator {
         Token::Eq => Ok(Object::Boolean(left == right)),
         Token::NotEq => Ok(Object::Boolean(left != right)),
@@ -49,7 +51,7 @@ fn eval_infix_boolean(operator: Token, right: bool, left: bool) -> Result<Object
     }
 }
 
-fn eval_infix(operator: Token, right: Object, left: Object) -> Result<Object, String> {
+fn eval_infix(operator: Token, right: Object, left: Object) -> EvalReturn {
     match (&left, &right) {
         (Object::Integer(left), Object::Integer(right)) => {
             eval_infix_integer(operator, *right, *left)
@@ -61,7 +63,7 @@ fn eval_infix(operator: Token, right: Object, left: Object) -> Result<Object, St
     }
 }
 
-fn eval_if_expression(ie: IfExpression, env: &mut Environment) -> Result<Object, String> {
+fn eval_if_expression(ie: IfExpression, env: &mut Environment) -> EvalReturn {
     let condition = eval((*ie.condition).into(), env)?;
 
     if condition.is_truthy() {
@@ -72,7 +74,7 @@ fn eval_if_expression(ie: IfExpression, env: &mut Environment) -> Result<Object,
         Ok(Object::Null)
     }
 }
-fn eval_block(block: Block, env: &mut Environment) -> Result<Object, String> {
+fn eval_block(block: Block, env: &mut Environment) -> EvalReturn {
     let mut result = Object::Null;
 
     for statement in block {
@@ -86,7 +88,7 @@ fn eval_block(block: Block, env: &mut Environment) -> Result<Object, String> {
     Ok(result)
 }
 
-fn eval_program(program: Program, env: &mut Environment) -> Result<Object, String> {
+fn eval_program(program: Program, env: &mut Environment) -> EvalReturn {
     let mut result = Object::Null;
     for statement in program.statements {
         result = eval(statement.into(), env)?;
@@ -97,7 +99,7 @@ fn eval_program(program: Program, env: &mut Environment) -> Result<Object, Strin
     Ok(result)
 }
 
-fn eval_statement(statement: Statement, env: &mut Environment) -> Result<Object, String> {
+fn eval_statement(statement: Statement, env: &mut Environment) -> EvalReturn {
     match statement {
         Statement::Expression(expression) => eval(expression.into(), env),
         Statement::Block(block) => eval_block(block, env),
@@ -114,7 +116,7 @@ fn eval_statement(statement: Statement, env: &mut Environment) -> Result<Object,
     }
 }
 
-fn eval_expression(expression: Expression, env: &mut Environment) -> Result<Object, String> {
+fn eval_expression(expression: Expression, env: &mut Environment) -> EvalReturn {
     match expression {
         Expression::Boolean(bool) => Ok(Object::Boolean(bool)),
         Expression::Integer(i) => Ok(Object::Integer(i)),
@@ -142,7 +144,7 @@ fn eval_expression(expression: Expression, env: &mut Environment) -> Result<Obje
     }
 }
 
-pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
+pub fn eval(node: Node, env: &mut Environment) -> EvalReturn {
     match node {
         Node::Program(p) => eval_program(p, env),
         Node::Statement(s) => eval_statement(s, env),
