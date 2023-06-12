@@ -61,7 +61,7 @@ fn eval_infix(operator: Token, right: Object, left: Object) -> Result<Object, St
     }
 }
 
-fn eval_if_expression(ie: IfExpression, mut env: &Environment) -> Result<Object, String> {
+fn eval_if_expression(ie: IfExpression, env: &mut Environment) -> Result<Object, String> {
     let condition = eval((*ie.condition).into(), env)?;
 
     if condition.is_truthy() {
@@ -72,7 +72,7 @@ fn eval_if_expression(ie: IfExpression, mut env: &Environment) -> Result<Object,
         Ok(Object::Null)
     }
 }
-fn eval_block(block: Block, mut env: &Environment) -> Result<Object, String> {
+fn eval_block(block: Block, env: &mut Environment) -> Result<Object, String> {
     let mut result = Object::Null;
 
     for statement in block {
@@ -86,7 +86,7 @@ fn eval_block(block: Block, mut env: &Environment) -> Result<Object, String> {
     Ok(result)
 }
 
-fn eval_program(program: Program, mut env: &Environment) -> Result<Object, String> {
+fn eval_program(program: Program, env: &mut Environment) -> Result<Object, String> {
     let mut result = Object::Null;
     for statement in program.statements {
         result = eval(statement.into(), env)?;
@@ -97,7 +97,7 @@ fn eval_program(program: Program, mut env: &Environment) -> Result<Object, Strin
     Ok(result)
 }
 
-fn eval_statement(statement: Statement, mut env: &Environment) -> Result<Object, String> {
+fn eval_statement(statement: Statement, env: &mut Environment) -> Result<Object, String> {
     match statement {
         Statement::Expression(expression) => eval(expression.into(), env),
         Statement::Block(block) => eval_block(block, env),
@@ -105,11 +105,16 @@ fn eval_statement(statement: Statement, mut env: &Environment) -> Result<Object,
             let val = eval(expression.into(), env)?;
             Ok(Object::ReturnValue(Box::new(val)))
         }
-        _ => Err(format!("unimplemented: {:?}", statement)),
+        Statement::Let { name, value } => {
+            let val = eval(value.into(), env)?;
+            env.set(&name, val.clone());
+
+            Ok(Object::Null)
+        }
     }
 }
 
-fn eval_expression(expression: Expression, mut env: &Environment) -> Result<Object, String> {
+fn eval_expression(expression: Expression, env: &mut Environment) -> Result<Object, String> {
     match expression {
         Expression::Boolean(bool) => Ok(Object::Boolean(bool)),
         Expression::Integer(i) => Ok(Object::Integer(i)),
@@ -127,11 +132,17 @@ fn eval_expression(expression: Expression, mut env: &Environment) -> Result<Obje
             eval_infix(operator, right, left)
         }
         Expression::If(ie) => eval_if_expression(ie, env),
+        Expression::Identifier(ident) => {
+            let val = env
+                .get(&ident)
+                .ok_or_else(|| format!("identifier not found: {}", ident))?;
+            Ok(val.clone())
+        }
         _ => Err(format!("unimplemented: {:?}", expression)),
     }
 }
 
-pub fn eval(node: Node, mut env: &Environment) -> Result<Object, String> {
+pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
     match node {
         Node::Program(p) => eval_program(p, env),
         Node::Statement(s) => eval_statement(s, env),
@@ -151,7 +162,7 @@ mod test {
 
         let mut env = Environment::new();
 
-        eval(program.into(), &env).unwrap_or_else(|e| {
+        eval(program.into(), &mut env).unwrap_or_else(|e| {
             panic!("eval error: {}", e);
         })
     }

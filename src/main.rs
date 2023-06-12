@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use writing_an_interpreter_in_rust::{
-    ast::Node, evaluator::eval, lexer::Lexer, object::Environment, parser::Parser,
+    evaluator::eval, lexer::Lexer, object::Environment, parser::Parser,
 };
 
 const PROMPT: &str = ">> ";
@@ -23,6 +23,9 @@ fn main() {
     println!("Hello! This is the Monkey programming language!");
     println!("Feel free to type in commands");
     println!("{}", MONKEY_FACE);
+
+    let mut env = Environment::new();
+
     loop {
         print!("{}", PROMPT);
         std::io::stdout().flush().unwrap();
@@ -35,8 +38,7 @@ fn main() {
 
         match program {
             Ok(program) => {
-                let mut env = Environment::new();
-                let evaluated = eval(Node::Program(program), &env);
+                let evaluated = eval(program.into(), &mut env);
                 match evaluated {
                     Ok(evaluated) => println!("{}", evaluated),
                     Err(error) => println!("{}", error),
