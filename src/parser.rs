@@ -1,4 +1,4 @@
-use crate::ast::{Expression, Identifier, Program, Statement};
+use crate::ast::{Expression, Identifier, IfExpression, Program, Statement};
 use crate::lexer::Lexer;
 use crate::token::Token;
 
@@ -343,11 +343,13 @@ impl<'lexer> Parser<'lexer> {
             alternative = Some(self.parse_block_statement()?);
         }
 
-        Ok(Expression::If {
+        let if_exp = IfExpression {
             condition: Box::new(condition),
             consequence,
             alternative,
-        })
+        };
+
+        Ok(Expression::If(if_exp))
     }
 
     fn parse_call_expression(&mut self, function: Expression) -> Result<Expression, String> {
@@ -599,15 +601,11 @@ mod tests {
 
         match stmt {
             Statement::Expression(expr) => match expr {
-                Expression::If {
-                    condition,
-                    consequence,
-                    alternative,
-                } => {
-                    assert_eq!(condition.to_string(), "(x < y)");
-                    assert_eq!(consequence.len(), 1);
-                    assert_eq!(consequence[0].to_string(), "x");
-                    assert!(alternative.is_none());
+                Expression::If(exp) => {
+                    assert_eq!(exp.condition.to_string(), "(x < y)");
+                    assert_eq!(exp.consequence.len(), 1);
+                    assert_eq!(exp.consequence[0].to_string(), "x");
+                    assert!(exp.alternative.is_none());
                 }
                 _ => panic!("stmt is not if expression"),
             },
@@ -630,16 +628,12 @@ mod tests {
 
         match stmt {
             Statement::Expression(expr) => match expr {
-                Expression::If {
-                    condition,
-                    consequence,
-                    alternative,
-                } => {
-                    assert_eq!(condition.to_string(), "(x < y)");
-                    assert_eq!(consequence.len(), 1);
-                    assert_eq!(consequence[0].to_string(), "x");
-                    assert!(alternative.is_some());
-                    let alternative = alternative.as_ref().unwrap();
+                Expression::If(exp) => {
+                    assert_eq!(exp.condition.to_string(), "(x < y)");
+                    assert_eq!(exp.consequence.len(), 1);
+                    assert_eq!(exp.consequence[0].to_string(), "x");
+                    assert!(exp.alternative.is_some());
+                    let alternative = exp.alternative.as_ref().unwrap();
                     assert_eq!(alternative.len(), 1);
                     assert_eq!(alternative[0].to_string(), "y");
                 }

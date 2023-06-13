@@ -44,6 +44,12 @@ impl Statement {
         }
     }
 }
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct IfExpression {
+    pub condition: Box<Expression>,
+    pub consequence: Block,
+    pub alternative: Option<Block>,
+}
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Expression {
@@ -59,11 +65,7 @@ pub enum Expression {
         operator: Token,
         right: Box<Expression>,
     },
-    If {
-        condition: Box<Expression>,
-        consequence: Block,
-        alternative: Option<Block>,
-    },
+    If(IfExpression),
     FunctionLiteral {
         parameters: Vec<Identifier>,
         body: Block,
@@ -88,17 +90,13 @@ impl Display for Expression {
                 operator,
                 right,
             } => write!(f, "({} {} {})", left, operator, right),
-            Expression::If {
-                condition,
-                consequence,
-                alternative,
-            } => {
+            Expression::If(exp) => {
                 let mut s = String::new();
-                s.push_str(&format!("if {} ", condition));
-                for stmt in consequence {
+                s.push_str(&format!("if {} ", exp.condition));
+                for stmt in &exp.consequence {
                     s.push_str(&format!("{}", stmt));
                 }
-                if let Some(alt) = alternative {
+                if let Some(alt) = &exp.alternative {
                     s.push_str("else ");
                     for stmt in alt {
                         s.push_str(&format!("{}", stmt));
@@ -157,6 +155,31 @@ impl Display for Program {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Node {
+    Program(Program),
     Statement(Statement),
     Expression(Expression),
+}
+
+impl From<Expression> for Node {
+    fn from(exp: Expression) -> Self {
+        Node::Expression(exp)
+    }
+}
+
+impl From<Statement> for Node {
+    fn from(stmt: Statement) -> Self {
+        Node::Statement(stmt)
+    }
+}
+
+impl From<Program> for Node {
+    fn from(prog: Program) -> Self {
+        Node::Program(prog)
+    }
+}
+
+impl From<Block> for Node {
+    fn from(block: Block) -> Self {
+        Node::Statement(Statement::Block(block))
+    }
 }
