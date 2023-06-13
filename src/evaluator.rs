@@ -37,16 +37,16 @@ fn eval_infix_integer(operator: Token, right: i64, left: i64) -> EvalReturn {
         Token::Slash => Ok(Some(Object::Integer(left / right))),
         Token::Lt => Ok(Some(Object::Boolean(left < right))),
         Token::Gt => Ok(Some(Object::Boolean(left > right))),
-        Token::Eq => Ok(Object::Boolean(left == right)),
-        Token::NotEq => Ok(Object::Boolean(left != right)),
+        Token::Eq => Ok(Some(Object::Boolean(left == right))),
+        Token::NotEq => Ok(Some(Object::Boolean(left != right))),
         _ => Err(format!("unknown operator: {} {} {}", left, operator, right)),
     }
 }
 
 fn eval_infix_boolean(operator: Token, right: bool, left: bool) -> EvalReturn {
     match operator {
-        Token::Eq => Ok(Object::Boolean(left == right)),
-        Token::NotEq => Ok(Object::Boolean(left != right)),
+        Token::Eq => Ok(Some(Object::Boolean(left == right))),
+        Token::NotEq => Ok(Some(Object::Boolean(left != right))),
         _ => Err(format!("unknown operator: {} {} {}", left, operator, right)),
     }
 }
@@ -66,21 +66,21 @@ fn eval_infix(operator: Token, right: Object, left: Object) -> EvalReturn {
 fn eval_if_expression(ie: IfExpression, env: &mut Environment) -> EvalReturn {
     let condition = eval((*ie.condition).into(), env)?;
 
-    if condition.is_truthy() {
+    if condition.is_some() && condition.unwrap().is_truthy() {
         eval(ie.consequence.into(), env)
     } else if let Some(alt) = ie.alternative {
         eval(alt.into(), env)
     } else {
-        Ok(Object::Null)
+        Ok(Some(Object::Null))
     }
 }
 fn eval_block(block: Block, env: &mut Environment) -> EvalReturn {
-    let mut result = Object::Null;
+    let mut result = Some(Object::Null);
 
     for statement in block {
         result = eval(statement.into(), env)?;
 
-        if result.is_return_value() {
+        if Some(true) == result.as_ref().map(|r| r.is_return_value()) {
             return Ok(result);
         }
     }
@@ -89,11 +89,11 @@ fn eval_block(block: Block, env: &mut Environment) -> EvalReturn {
 }
 
 fn eval_program(program: Program, env: &mut Environment) -> EvalReturn {
-    let mut result = Object::Null;
+    let mut result = None;
     for statement in program.statements {
         result = eval(statement.into(), env)?;
-        if let Object::ReturnValue(value) = result {
-            return Ok(*value);
+        if let Some(Object::ReturnValue(value)) = result {
+            return Ok(Some(*value));
         }
     }
     Ok(result)
@@ -104,24 +104,28 @@ fn eval_statement(statement: Statement, env: &mut Environment) -> EvalReturn {
         Statement::Expression(expression) => eval(expression.into(), env),
         Statement::Block(block) => eval_block(block, env),
         Statement::Return(expression) => {
-            let val = eval(expression.into(), env)?;
-            Ok(Object::ReturnValue(Box::new(val)))
+            let val = eval(expression.into(), env)?.expect("return value");
+
+            Ok(Some(Object::ReturnValue(Box::new(val))))
         }
         Statement::Let { name, value } => {
-            let val = eval(value.into(), env)?;
+            let val = eval(value.into(), env)?
+                .expect("let statement value should be evaluated to an object");
             env.set(&name, val.clone());
 
-            Ok(Object::Null)
+            Ok(None)
         }
     }
 }
 
 fn eval_expression(expression: Expression, env: &mut Environment) -> EvalReturn {
     match expression {
-        Expression::Boolean(bool) => Ok(Object::Boolean(bool)),
-        Expression::Integer(i) => Ok(Object::Integer(i)),
+        Expression::Boolean(bool) => Ok(Some(Object::Boolean(bool))),
+        Expression::Integer(i) => Ok(Some(Object::Integer(i))),
         Expression::Prefix { operator, right } => {
-            let right = eval_expression(*right, env)?;
+            let right = eval_expression(*right, env)?
+                .expect("prefix expression should be evaluated to an object");
+
             eval_prefix(operator, right)
         }
         Expression::Infix {
@@ -129,8 +133,11 @@ fn eval_expression(expression: Expression, env: &mut Environment) -> EvalReturn 
             operator,
             right,
         } => {
-            let left = eval_expression(*left, env)?;
-            let right = eval_expression(*right, env)?;
+            let left = eval_expression(*left, env)?
+                .expect("left side of infix expression should be evaluated to an object");
+            let right = eval_expression(*right, env)?
+                .expect("right side of infix expression should be evaluated to an object");
+
             eval_infix(operator, right, left)
         }
         Expression::If(ie) => eval_if_expression(ie, env),
@@ -138,7 +145,7 @@ fn eval_expression(expression: Expression, env: &mut Environment) -> EvalReturn 
             let val = env
                 .get(&ident)
                 .ok_or_else(|| format!("identifier not found: {}", ident))?;
-            Ok(val.clone())
+            Ok(Some(val.clone()))
         }
         _ => Err(format!("unimplemented: {:?}", expression)),
     }
@@ -157,7 +164,7 @@ mod test {
     use super::*;
     use crate::{lexer::Lexer, parser::Parser};
 
-    fn run_eval(input: &str) -> Object {
+    fn run_eval(input: &str) -> Option<Object> {
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program().unwrap();
@@ -171,98 +178,98 @@ mod test {
 
     #[test]
     fn test_eval_int() {
-        assert_eq!(run_eval("5"), Object::Integer(5));
-        assert_eq!(run_eval("10"), Object::Integer(10));
-        assert_eq!(run_eval("-5"), Object::Integer(-5));
-        assert_eq!(run_eval("-10"), Object::Integer(-10));
-        assert_eq!(run_eval("5 + 5 + 5 + 5 - 10"), Object::Integer(10));
-        assert_eq!(run_eval("2 * 2 * 2 * 2 * 2"), Object::Integer(32));
-        assert_eq!(run_eval("-50 + 100 + -50"), Object::Integer(0));
-        assert_eq!(run_eval("5 * 2 + 10"), Object::Integer(20));
-        assert_eq!(run_eval("5 + 2 * 10"), Object::Integer(25));
-        assert_eq!(run_eval("20 + 2 * -10"), Object::Integer(0));
-        assert_eq!(run_eval("50 / 2 * 2 + 10"), Object::Integer(60));
-        assert_eq!(run_eval("2 * (5 + 10)"), Object::Integer(30));
-        assert_eq!(run_eval("3 * 3 * 3 + 10"), Object::Integer(37));
-        assert_eq!(run_eval("3 * (3 * 3) + 10"), Object::Integer(37));
+        assert_eq!(run_eval("5"), Some(Object::Integer(5)));
+        assert_eq!(run_eval("10"), Some(Object::Integer(10)));
+        assert_eq!(run_eval("-5"), Some(Object::Integer(-5)));
+        assert_eq!(run_eval("-10"), Some(Object::Integer(-10)));
+        assert_eq!(run_eval("5 + 5 + 5 + 5 - 10"), Some(Object::Integer(10)));
+        assert_eq!(run_eval("2 * 2 * 2 * 2 * 2"), Some(Object::Integer(32)));
+        assert_eq!(run_eval("-50 + 100 + -50"), Some(Object::Integer(0)));
+        assert_eq!(run_eval("5 * 2 + 10"), Some(Object::Integer(20)));
+        assert_eq!(run_eval("5 + 2 * 10"), Some(Object::Integer(25)));
+        assert_eq!(run_eval("20 + 2 * -10"), Some(Object::Integer(0)));
+        assert_eq!(run_eval("50 / 2 * 2 + 10"), Some(Object::Integer(60)));
+        assert_eq!(run_eval("2 * (5 + 10)"), Some(Object::Integer(30)));
+        assert_eq!(run_eval("3 * 3 * 3 + 10"), Some(Object::Integer(37)));
+        assert_eq!(run_eval("3 * (3 * 3) + 10"), Some(Object::Integer(37)));
         assert_eq!(
             run_eval("(5 + 10 * 2 + 15 / 3) * 2 + -10"),
-            Object::Integer(50)
+            Some(Object::Integer(50))
         );
     }
 
     #[test]
     fn test_eval_bool() {
-        assert_eq!(run_eval("true"), Object::Boolean(true));
-        assert_eq!(run_eval("false"), Object::Boolean(false));
-        assert_eq!(run_eval("1 < 2"), Object::Boolean(true));
-        assert_eq!(run_eval("1 > 2"), Object::Boolean(false));
-        assert_eq!(run_eval("1 < 1"), Object::Boolean(false));
-        assert_eq!(run_eval("1 > 1"), Object::Boolean(false));
-        assert_eq!(run_eval("1 == 1"), Object::Boolean(true));
-        assert_eq!(run_eval("1 != 1"), Object::Boolean(false));
-        assert_eq!(run_eval("1 == 2"), Object::Boolean(false));
-        assert_eq!(run_eval("1 != 2"), Object::Boolean(true));
-        assert_eq!(run_eval("true == true"), Object::Boolean(true));
-        assert_eq!(run_eval("false == false"), Object::Boolean(true));
-        assert_eq!(run_eval("true == false"), Object::Boolean(false));
-        assert_eq!(run_eval("true != false"), Object::Boolean(true));
+        assert_eq!(run_eval("true"), Some(Object::Boolean(true)));
+        assert_eq!(run_eval("false"), Some(Object::Boolean(false)));
+        assert_eq!(run_eval("1 < 2"), Some(Object::Boolean(true)));
+        assert_eq!(run_eval("1 > 2"), Some(Object::Boolean(false)));
+        assert_eq!(run_eval("1 < 1"), Some(Object::Boolean(false)));
+        assert_eq!(run_eval("1 > 1"), Some(Object::Boolean(false)));
+        assert_eq!(run_eval("1 == 1"), Some(Object::Boolean(true)));
+        assert_eq!(run_eval("1 != 1"), Some(Object::Boolean(false)));
+        assert_eq!(run_eval("1 == 2"), Some(Object::Boolean(false)));
+        assert_eq!(run_eval("1 != 2"), Some(Object::Boolean(true)));
+        assert_eq!(run_eval("true == true"), Some(Object::Boolean(true)));
+        assert_eq!(run_eval("false == false"), Some(Object::Boolean(true)));
+        assert_eq!(run_eval("true == false"), Some(Object::Boolean(false)));
+        assert_eq!(run_eval("true != false"), Some(Object::Boolean(true)));
     }
 
     #[test]
     fn test_eval_bang() {
         let case_one = "!true";
 
-        let case_one_result = run_eval(case_one);
+        let case_one_result = run_eval(case_one).unwrap();
 
         assert_eq!(case_one_result, Object::Boolean(false));
 
         let case_two = "!false";
 
-        let case_two_result = run_eval(case_two);
+        let case_two_result = run_eval(case_two).unwrap();
 
         assert_eq!(case_two_result, Object::Boolean(true));
 
         let case_three = "!5";
 
-        let case_three_result = run_eval(case_three);
+        let case_three_result = run_eval(case_three).unwrap();
 
         assert_eq!(case_three_result, Object::Boolean(false));
 
         let case_four = "!!true";
 
-        let case_four_result = run_eval(case_four);
+        let case_four_result = run_eval(case_four).unwrap();
 
         assert_eq!(case_four_result, Object::Boolean(true));
 
         let case_five = "!!false";
 
-        let case_five_result = run_eval(case_five);
+        let case_five_result = run_eval(case_five).unwrap();
 
         assert_eq!(case_five_result, Object::Boolean(false));
     }
 
     #[test]
     fn test_eval_if() {
-        assert_eq!(run_eval("if (true) { 10 }"), Object::Integer(10));
-        assert_eq!(run_eval("if (false) { 10 }"), Object::Null);
-        assert_eq!(run_eval("if (1) { 10 }"), Object::Integer(10));
-        assert_eq!(run_eval("if (1 < 2) { 10 }"), Object::Integer(10));
-        assert_eq!(run_eval("if (1 > 2) { 10 }"), Object::Null);
+        assert_eq!(run_eval("if (true) { 10 }").unwrap(), Object::Integer(10));
+        assert_eq!(run_eval("if (false) { 10 }").unwrap(), Object::Null);
+        assert_eq!(run_eval("if (1) { 10 }").unwrap(), Object::Integer(10));
+        assert_eq!(run_eval("if (1 < 2) { 10 }").unwrap(), Object::Integer(10));
+        assert_eq!(run_eval("if (1 > 2) { 10 }").unwrap(), Object::Null);
         assert_eq!(
-            run_eval("if (1 > 2) { 10 } else { 20 }"),
+            run_eval("if (1 > 2) { 10 } else { 20 }").unwrap(),
             Object::Integer(20)
         );
         assert_eq!(
-            run_eval("if (1 < 2) { 10 } else { 20 }"),
+            run_eval("if (1 < 2) { 10 } else { 20 }").unwrap(),
             Object::Integer(10)
-        );
+        )
     }
 
     #[test]
     fn test_return_statements() {
-        assert_eq!(run_eval("return 10;"), Object::Integer(10));
-        assert_eq!(run_eval("return 10; 9;"), Object::Integer(10));
+        assert_eq!(run_eval("return 10;").unwrap(), Object::Integer(10));
+        assert_eq!(run_eval("return 10; 9;").unwrap(), Object::Integer(10));
         assert_eq!(
             run_eval(
                 "if (10 > 1) {
@@ -271,7 +278,8 @@ mod test {
                     }
                     return 1; 
                 }",
-            ),
+            )
+            .unwrap(),
             Object::Integer(10)
         );
     }

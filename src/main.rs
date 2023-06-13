@@ -40,7 +40,11 @@ fn main() {
             Ok(program) => {
                 let evaluated = eval(program.into(), &mut env);
                 match evaluated {
-                    Ok(evaluated) => println!("{}", evaluated),
+                    Ok(evaluated) => {
+                        if let Some(evaluated) = evaluated {
+                            println!("{}", evaluated);
+                        }
+                    }
                     Err(error) => println!("{}", error),
                 }
             }
