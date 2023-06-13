@@ -111,7 +111,7 @@ fn eval_statement(statement: Statement, env: &mut Environment) -> EvalReturn {
         Statement::Let { name, value } => {
             let val = eval(value.into(), env)?
                 .expect("let statement value should be evaluated to an object");
-            env.set(&name, val.clone());
+            env.set(&name, val);
 
             Ok(None)
         }
@@ -145,7 +145,7 @@ fn eval_expression(expression: Expression, env: &mut Environment) -> EvalReturn 
             let val = env
                 .get(&ident)
                 .ok_or_else(|| format!("identifier not found: {}", ident))?;
-            Ok(Some(val.clone()))
+            Ok(Some(val))
         }
         _ => Err(format!("unimplemented: {:?}", expression)),
     }
