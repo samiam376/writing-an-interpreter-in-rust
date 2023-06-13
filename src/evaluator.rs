@@ -354,4 +354,14 @@ mod test {
 
         assert_eq!(run_eval("fn (x) {x;}(5);"), Some(Object::Integer(5)));
     }
+
+    #[test]
+    fn test_closure() {
+        assert_eq!(
+            run_eval(
+                "let newAdder = fn (x) {fn (y) {x + y};}; let addTwo = newAdder(2); addTwo(2);"
+            ),
+            Some(Object::Integer(4))
+        );
+    }
 }
