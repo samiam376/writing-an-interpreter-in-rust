@@ -1,6 +1,6 @@
 use crate::{
     ast::{Block, Expression, IfExpression, Node, Program, Statement},
-    object::{Environment, Object},
+    object::{Environment, Function, Object},
     token::Token,
 };
 
@@ -118,6 +118,26 @@ fn eval_statement(statement: Statement, env: &mut Environment) -> EvalReturn {
     }
 }
 
+fn apply_function(fun: Object, args: Vec<Object>) -> EvalReturn {
+    let fun = match fun {
+        Object::Function(fun) => fun,
+        _ => panic!("not a function: {:?}", fun),
+    };
+
+    let mut env = fun.env.to_enclosed();
+    for (param, arg) in fun.parameters.iter().zip(args) {
+        env.set(param, arg);
+    }
+
+    let evaluated = eval(fun.body.into(), &mut env)?;
+
+    match evaluated {
+        Some(Object::ReturnValue(value)) => Ok(Some(*value)),
+        Some(value) => Ok(Some(value)),
+        None => Ok(None),
+    }
+}
+
 fn eval_expression(expression: Expression, env: &mut Environment) -> EvalReturn {
     match expression {
         Expression::Boolean(bool) => Ok(Some(Object::Boolean(bool))),
@@ -147,7 +167,30 @@ fn eval_expression(expression: Expression, env: &mut Environment) -> EvalReturn 
                 .ok_or_else(|| format!("identifier not found: {}", ident))?;
             Ok(Some(val))
         }
-        _ => Err(format!("unimplemented: {:?}", expression)),
+        Expression::FunctionLiteral { parameters, body } => Ok(Some(Object::Function(
+            Function::new(parameters, body, env.clone()),
+        ))),
+        Expression::Call {
+            function,
+            arguments,
+        } => {
+            let function = eval_expression(*function, env)?.expect(
+                "function should be evaluated to an object, and that object should be a function",
+            );
+
+            let args = arguments
+                .into_iter()
+                .map(|arg| {
+                    eval_expression(arg, env).expect(
+                        "
+                arguments should be evaluated to objects",
+                    )
+                })
+                .map(|arg| arg.expect("arguments should be evaluated to objects"))
+                .collect::<Vec<Object>>();
+
+            apply_function(function, args)
+        }
     }
 }
 
@@ -282,5 +325,33 @@ mod test {
             .unwrap(),
             Object::Integer(10)
         );
+    }
+
+    #[test]
+    fn test_function() {
+        assert_eq!(
+            run_eval("let identity = fn (x) {x}; identity(5);"),
+            Some(Object::Integer(5))
+        );
+        assert_eq!(
+            run_eval("let identity = fn (x) {return x;}; identity(5);"),
+            Some(Object::Integer(5))
+        );
+        assert_eq!(
+            run_eval("let double = fn (x) {x * 2;}; double(5);"),
+            Some(Object::Integer(10))
+        );
+
+        assert_eq!(
+            run_eval("let add = fn (x, y) {x + y;}; add(5, 5);"),
+            Some(Object::Integer(10))
+        );
+
+        assert_eq!(
+            run_eval("let add = fn (x, y) {x + y;}; add(5 + 5, add(5, 5));"),
+            Some(Object::Integer(20))
+        );
+
+        assert_eq!(run_eval("fn (x) {x;}(5);"), Some(Object::Integer(5)));
     }
 }

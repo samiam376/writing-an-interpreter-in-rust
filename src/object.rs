@@ -62,7 +62,7 @@ impl Display for Object {
             Object::Boolean(b) => write!(f, "{}", b),
             Object::Null => write!(f, "null"),
             Object::ReturnValue(obj) => write!(f, "{}", obj),
-            Object::Function(_f) => todo!(),
+            Object::Function(fun) => write!(f, "{}", fun),
         }
     }
 }
@@ -70,19 +70,36 @@ impl Display for Object {
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub struct Environment {
     store: Rc<RefCell<HashMap<String, Object>>>,
+    outer: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Environment {
     pub fn new() -> Self {
         Self {
             store: Rc::new(RefCell::new(HashMap::new())),
+            outer: None,
+        }
+    }
+
+    pub fn to_enclosed(&self) -> Self {
+        Self {
+            store: Rc::new(RefCell::new(HashMap::new())),
+            outer: Some(Rc::new(RefCell::new(self.clone()))),
         }
     }
 
     pub fn get(&self, name: &str) -> Option<Object> {
-        self.store.borrow().get(name).cloned()
-    }
+        let obj = self.store.borrow().get(name).cloned();
+        if obj.is_some() {
+            return obj;
+        };
 
+        if let Some(outer) = &self.outer {
+            outer.borrow().get(name)
+        } else {
+            None
+        }
+    }
     pub fn set(&mut self, name: &str, obj: Object) {
         self.store.borrow_mut().insert(name.to_string(), obj);
     }
@@ -90,7 +107,34 @@ impl Environment {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Function {
-    parameters: Vec<Identifier>,
-    body: Block,
-    env: Environment,
+    pub parameters: Vec<Identifier>,
+    pub body: Block,
+    pub env: Environment,
+}
+
+impl Function {
+    pub fn new(parameters: Vec<Identifier>, body: Block, env: Environment) -> Self {
+        Self {
+            parameters,
+            body,
+            env,
+        }
+    }
+}
+
+impl Display for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let params = self
+            .parameters
+            .iter()
+            .map(|p| p.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let mut body = String::new();
+        for stmt in &self.body {
+            body.push_str(&format!("{}\n", stmt));
+        }
+        write!(f, "fn({}) {{\n{}\n}}", params, body)
+    }
 }
