@@ -15,6 +15,7 @@ pub enum BuiltInFunction {
     Last(Last),
     Rest(Rest),
     Push(Push),
+    Puts(Puts),
 }
 
 impl Apply for BuiltInFunction {
@@ -25,7 +26,20 @@ impl Apply for BuiltInFunction {
             BuiltInFunction::Last(last) => last.apply(args),
             BuiltInFunction::Rest(rest) => rest.apply(args),
             BuiltInFunction::Push(push) => push.apply(args),
+            BuiltInFunction::Puts(puts) => puts.apply(args),
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Puts;
+
+impl Apply for Puts {
+    fn apply(&self, args: Vec<Object>) -> EvalReturn {
+        for arg in args {
+            println!("{}", arg);
+        }
+        Ok(None)
     }
 }
 
@@ -189,6 +203,7 @@ impl Object {
             "last" => Some(Object::Builtin(BuiltInFunction::Last(Last))),
             "rest" => Some(Object::Builtin(BuiltInFunction::Rest(Rest))),
             "push" => Some(Object::Builtin(BuiltInFunction::Push(Push))),
+            "puts" => Some(Object::Builtin(BuiltInFunction::Puts(Puts))),
             _ => None,
         }
     }
