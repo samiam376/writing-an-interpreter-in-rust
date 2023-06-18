@@ -51,6 +51,13 @@ fn eval_infix_boolean(operator: Token, right: bool, left: bool) -> EvalReturn {
     }
 }
 
+fn eval_infix_string(operator: Token, right: String, left: String) -> EvalReturn {
+    match operator {
+        Token::Plus => Ok(Some(Object::String(left + &right))),
+        _ => Err(format!("unknown operator: {} {} {}", left, operator, right)),
+    }
+}
+
 fn eval_infix(operator: Token, right: Object, left: Object) -> EvalReturn {
     match (&left, &right) {
         (Object::Integer(left), Object::Integer(right)) => {
@@ -58,6 +65,9 @@ fn eval_infix(operator: Token, right: Object, left: Object) -> EvalReturn {
         }
         (Object::Boolean(left), Object::Boolean(right)) => {
             eval_infix_boolean(operator, *right, *left)
+        }
+        (Object::String(left), Object::String(right)) => {
+            eval_infix_string(operator, right.clone(), left.clone())
         }
         _ => Err(format!("unknown operator: {} {} {}", left, operator, right)),
     }
@@ -372,9 +382,9 @@ mod test {
             run_eval("\"Hello World!\""),
             Some(Object::String("Hello World!".to_string()))
         );
-        // assert_eq!(
-        //     run_eval("\"Hello\" + \" \" + \"World!\""),
-        //     Some(Object::String("Hello World!".to_string()))
-        // );
+        assert_eq!(
+            run_eval("\"Hello\" + \" \" + \"World!\""),
+            Some(Object::String("Hello World!".to_string()))
+        );
     }
 }
