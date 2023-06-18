@@ -14,6 +14,7 @@ pub enum BuiltInFunction {
     First(First),
     Last(Last),
     Rest(Rest),
+    Push(Push),
 }
 
 impl Apply for BuiltInFunction {
@@ -23,6 +24,7 @@ impl Apply for BuiltInFunction {
             BuiltInFunction::First(first) => first.apply(args),
             BuiltInFunction::Last(last) => last.apply(args),
             BuiltInFunction::Rest(rest) => rest.apply(args),
+            BuiltInFunction::Push(push) => push.apply(args),
         }
     }
 }
@@ -128,6 +130,32 @@ impl Apply for Rest {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Push;
+
+impl Apply for Push {
+    fn apply(&self, args: Vec<Object>) -> EvalReturn {
+        if args.len() != 2 {
+            return Err(format!(
+                "wrong number of arguments. got={}, want=2",
+                args.len()
+            ));
+        };
+
+        match (&args[0], &args[1]) {
+            (Object::Array(arr), obj) => {
+                let mut new_arr = arr.clone();
+                new_arr.push(obj.clone());
+                Ok(Some(Object::Array(new_arr)))
+            }
+            _ => Err(format!(
+                "argument to `push` must be ARRAY, with valid idx got={}, idx={}",
+                args[0], args[1]
+            )),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Object {
     Integer(i64),
     String(String),
@@ -146,6 +174,7 @@ impl Object {
             "first" => Some(Object::Builtin(BuiltInFunction::First(First))),
             "last" => Some(Object::Builtin(BuiltInFunction::Last(Last))),
             "rest" => Some(Object::Builtin(BuiltInFunction::Rest(Rest))),
+            "push" => Some(Object::Builtin(BuiltInFunction::Push(Push))),
             _ => None,
         }
     }
