@@ -244,6 +244,7 @@ fn eval_expression(expression: Expression, env: &mut Environment) -> EvalReturn 
                 _ => Err("index operator not supported".into()),
             }
         }
+        Expression::HashLiteral(_) => todo!(),
     }
 }
 

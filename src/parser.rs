@@ -120,6 +120,46 @@ impl<'lexer> Parser<'lexer> {
         Ok(Statement::Return(expression))
     }
 
+    fn parse_hash_literal(&mut self) -> Result<Expression, String> {
+        let mut pairs = Vec::new();
+
+        while self.peek_token != Some(Token::RBrace) {
+            self.next_token();
+
+            let key = self.parse_expression(Precedence::Lowest)?;
+
+            if self.peek_token != Some(Token::Colon) {
+                return Err("parse error: invalid token for hash literal".to_string());
+            }
+
+            self.next_token();
+            self.next_token();
+
+            let value = self.parse_expression(Precedence::Lowest)?;
+
+            pairs.push((key, value));
+
+            if self.peek_token != Some(Token::RBrace) && self.peek_token != Some(Token::Comma) {
+                return Err("parse error: invalid token for hash literal".to_string());
+            };
+
+            if self.peek_token == Some(Token::Comma) {
+                self.next_token();
+            }
+        }
+
+        if self.peek_token != Some(Token::RBrace) {
+            return Err("parse error: invalid token for hash literal".to_string());
+        }
+
+        self.next_token();
+
+        println!("cur_token 8: {:?}", self.cur_token);
+        println!("peek_token 8: {:?}", self.peek_token);
+
+        Ok(Expression::HashLiteral(pairs))
+    }
+
     fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression, String> {
         let prefix = self.parse_prefix()?;
 
@@ -314,6 +354,7 @@ impl<'lexer> Parser<'lexer> {
                 Token::If => self.parse_if_expression(),
                 Token::Function => self.parse_function_literal(),
                 Token::LBracket => self.parse_array_literal(),
+                Token::LBrace => self.parse_hash_literal(),
                 _ => Err(format!(
                     "parse error: no parse function for prefix {:?}",
                     token
@@ -823,6 +864,66 @@ mod tests {
                     assert_eq!(index.to_string(), "(1 + 1)");
                 }
                 _ => panic!("stmt is not index expression"),
+            },
+            _ => panic!("stmt is not expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_parse_hash_literal() {
+        let input = r#"{"one": 1, "two": 2, "three": 3}"#;
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser
+            .parse_program()
+            .unwrap_or_else(|e| panic!("parse errors for test: {} \n Parse Error: {:?}", input, e));
+
+        let stmt = program.statements.first().unwrap();
+
+        match stmt {
+            Statement::Expression(expr) => match expr {
+                Expression::HashLiteral(pairs) => {
+                    assert_eq!(pairs.len(), 3);
+
+                    let expected = vec![
+                        ("one".to_string(), "1".to_string()),
+                        ("two".to_string(), "2".to_string()),
+                        ("three".to_string(), "3".to_string()),
+                    ];
+
+                    for (idx, (key, value)) in expected.iter().enumerate() {
+                        let pair = pairs.get(idx).unwrap();
+                        assert_eq!(pair.0.to_string(), key.to_string());
+                        assert_eq!(pair.1.to_string(), value.to_string());
+                    }
+                }
+                _ => panic!("stmt is not hash literal"),
+            },
+            _ => panic!("stmt is not expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_empty_hash_literal() {
+        let input = "{}";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser
+            .parse_program()
+            .unwrap_or_else(|e| panic!("parse errors for test: {} \n Parse Error: {:?}", input, e));
+
+        let stmt = program.statements.first().unwrap();
+
+        match stmt {
+            Statement::Expression(expr) => match expr {
+                Expression::HashLiteral(pairs) => {
+                    assert_eq!(pairs.len(), 0);
+                }
+                _ => panic!("stmt is not hash literal"),
             },
             _ => panic!("stmt is not expression statement"),
         }

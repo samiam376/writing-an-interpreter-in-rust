@@ -80,6 +80,7 @@ pub enum Expression {
         left: Box<Expression>,
         index: Box<Expression>,
     },
+    HashLiteral(Vec<(Expression, Expression)>),
 }
 
 impl Display for Expression {
@@ -162,6 +163,19 @@ impl Display for Expression {
                 s.push_str(&format!("{}", index));
                 s.push(']');
                 s.push(')');
+                write!(f, "{}", s)
+            }
+            Expression::HashLiteral(h) => {
+                let mut s = String::new();
+                s.push('{');
+                let elements = h
+                    .iter()
+                    .map(|(k, v)| format!("{}: {}", k, v))
+                    .collect::<Vec<String>>()
+                    .join(",");
+
+                s.push_str(&elements);
+                s.push('}');
                 write!(f, "{}", s)
             }
         }

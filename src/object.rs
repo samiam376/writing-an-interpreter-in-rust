@@ -155,6 +155,19 @@ impl Apply for Push {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum HashKey {
+    Integer(i64),
+    Boolean(bool),
+    String(String),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct HashPair {
+    pub key: Object,
+    pub value: Object,
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Object {
     Integer(i64),
@@ -165,6 +178,7 @@ pub enum Object {
     Function(Function),
     Builtin(BuiltInFunction),
     Array(Vec<Object>),
+    Hash { pairs: HashMap<HashKey, HashPair> },
 }
 
 impl Object {
@@ -176,6 +190,15 @@ impl Object {
             "rest" => Some(Object::Builtin(BuiltInFunction::Rest(Rest))),
             "push" => Some(Object::Builtin(BuiltInFunction::Push(Push))),
             _ => None,
+        }
+    }
+
+    pub fn hash_key(&self) -> Result<HashKey, String> {
+        match self {
+            Object::Integer(i) => Ok(HashKey::Integer(*i)),
+            Object::Boolean(b) => Ok(HashKey::Boolean(*b)),
+            Object::String(s) => Ok(HashKey::String(s.clone())),
+            _ => Err(format!("unusable as hash key: {}", self)),
         }
     }
 
@@ -247,6 +270,14 @@ impl Display for Object {
                     .collect::<Vec<_>>()
                     .join(", ");
                 write!(f, "[{}]", elements)
+            }
+            Object::Hash { pairs } => {
+                let elements = pairs
+                    .iter()
+                    .map(|(_k, v)| format!("{}: {}", v.key, v.value))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(f, "{{{}}}", elements)
             }
         }
     }
