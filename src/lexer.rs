@@ -52,7 +52,7 @@ impl<'input_string_lifetime> Lexer<'input_string_lifetime> {
         let position = self.position + 1;
         loop {
             self.read_char();
-            if self.ch == Some("\"") || self.ch == None {
+            if self.ch == Some("\"") || self.ch.is_none() {
                 break;
             }
         }

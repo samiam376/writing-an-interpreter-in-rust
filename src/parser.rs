@@ -173,7 +173,7 @@ impl<'lexer> Parser<'lexer> {
         self.next_token();
 
         Ok(Expression::Index {
-            left: Box::new(left.clone()),
+            left: Box::new(left),
             index: Box::new(index),
         })
     }

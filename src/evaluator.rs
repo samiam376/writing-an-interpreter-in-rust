@@ -213,8 +213,39 @@ fn eval_expression(expression: Expression, env: &mut Environment) -> EvalReturn 
             apply_function(function, args)
         }
         Expression::String(s) => Ok(Some(s.into())),
-        Expression::ArrayLiteral(_) => todo!(),
-        Expression::Index { left, index } => todo!(),
+        Expression::ArrayLiteral(elements) => {
+            let elements = elements
+                .into_iter()
+                .map(|e| eval_expression(e, env))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            let flattened = elements.into_iter().flatten().collect();
+
+            Ok(Some(Object::Array(flattened)))
+        }
+        Expression::Index { left, index } => {
+            let left = eval_expression(*left, env)?
+                .expect("left side of index expression should be evaluated to an object");
+
+            let index = eval_expression(*index, env)?
+                .expect("index expression should be evaluated to an object");
+
+            match (left, index) {
+                (Object::Array(arr), Object::Integer(i)) => {
+                    let i = i as usize;
+                    if i >= arr.len() {
+                        return Err(format!(
+                            "index out of bounds: the len is {} but the index is {}",
+                            arr.len(),
+                            i
+                        ));
+                    }
+
+                    Ok(Some(arr[i].clone()))
+                }
+                _ => Err("index operator not supported".into()),
+            }
+        }
     }
 }
 
@@ -410,6 +441,18 @@ mod test {
         assert_eq!(
             run_eval("len(\"four\")"),
             Some(Object::Integer("four".len() as i64))
+        );
+    }
+
+    #[test]
+    fn test_array_literal() {
+        assert_eq!(
+            run_eval("[1, 2 * 2, 3 + 3]"),
+            Some(Object::Array(vec![
+                Object::Integer(1),
+                Object::Integer(4),
+                Object::Integer(6)
+            ]))
         );
     }
 }

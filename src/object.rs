@@ -49,6 +49,7 @@ pub enum Object {
     ReturnValue(Box<Object>),
     Function(Function),
     Builtin(BuiltInFunction),
+    Array(Vec<Object>),
 }
 
 impl Object {
@@ -116,6 +117,14 @@ impl Display for Object {
             Object::Function(fun) => write!(f, "{}", fun),
             Object::String(s) => write!(f, "{}", s),
             Object::Builtin(b) => write!(f, "{:?}", b),
+            Object::Array(arr) => {
+                let elements = arr
+                    .iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(f, "[{}]", elements)
+            }
         }
     }
 }
