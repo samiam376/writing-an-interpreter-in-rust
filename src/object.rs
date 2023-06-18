@@ -11,12 +11,18 @@ pub trait Apply {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BuiltInFunction {
     Len(Len),
+    First(First),
+    Last(Last),
+    Rest(Rest),
 }
 
 impl Apply for BuiltInFunction {
     fn apply(&self, args: Vec<Object>) -> EvalReturn {
         match self {
             BuiltInFunction::Len(len) => len.apply(args),
+            BuiltInFunction::First(first) => first.apply(args),
+            BuiltInFunction::Last(last) => last.apply(args),
+            BuiltInFunction::Rest(rest) => rest.apply(args),
         }
     }
 }
@@ -41,6 +47,87 @@ impl Apply for Len {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub struct First;
+
+impl Apply for First {
+    fn apply(&self, args: Vec<Object>) -> EvalReturn {
+        if args.len() != 1 {
+            return Err(format!(
+                "wrong number of arguments. got={}, want=1",
+                args.len()
+            ));
+        };
+
+        match &args[0] {
+            Object::Array(arr) => {
+                let first = arr.first();
+                if let Some(first) = first {
+                    Ok(Some(first.clone()))
+                } else {
+                    Ok(Some(Object::Null))
+                }
+            }
+            _ => Err(format!(
+                "argument to `first` must be ARRAY, got={}",
+                args[0]
+            )),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Last;
+
+impl Apply for Last {
+    fn apply(&self, args: Vec<Object>) -> EvalReturn {
+        if args.len() != 1 {
+            return Err(format!(
+                "wrong number of arguments. got={}, want=1",
+                args.len()
+            ));
+        };
+
+        match &args[0] {
+            Object::Array(arr) => {
+                let last = arr.last();
+                if let Some(last) = last {
+                    Ok(Some(last.clone()))
+                } else {
+                    Ok(Some(Object::Null))
+                }
+            }
+            _ => Err(format!("argument to `last` must be ARRAY, got={}", args[0])),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Rest;
+
+impl Apply for Rest {
+    fn apply(&self, args: Vec<Object>) -> EvalReturn {
+        if args.len() != 2 {
+            return Err(format!(
+                "wrong number of arguments. got={}, want=2",
+                args.len()
+            ));
+        };
+
+        match (&args[0], &args[1]) {
+            (Object::Array(arr), Object::Integer(n)) => {
+                let idx = *n as usize;
+                let rest = arr[idx..].to_vec();
+                Ok(Some(Object::Array(rest)))
+            }
+            _ => Err(format!(
+                "argument to `rest` must be ARRAY, with valid idx got={}, idx={}",
+                args[0], args[1]
+            )),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Object {
     Integer(i64),
     String(String),
@@ -56,6 +143,9 @@ impl Object {
     pub fn lookup_builtin(input: &str) -> Option<Object> {
         match input {
             "len" => Some(Object::Builtin(BuiltInFunction::Len(Len))),
+            "first" => Some(Object::Builtin(BuiltInFunction::First(First))),
+            "last" => Some(Object::Builtin(BuiltInFunction::Last(Last))),
+            "rest" => Some(Object::Builtin(BuiltInFunction::Rest(Rest))),
             _ => None,
         }
     }
@@ -86,6 +176,10 @@ impl Object {
 
     pub fn is_function(&self) -> bool {
         matches!(self, Object::Function(_))
+    }
+
+    pub fn is_array(&self) -> bool {
+        matches!(self, Object::Array(_))
     }
 }
 

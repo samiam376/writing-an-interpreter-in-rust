@@ -180,7 +180,6 @@ fn eval_expression(expression: Expression, env: &mut Environment) -> EvalReturn 
             };
 
             let builtin = Object::lookup_builtin(&ident);
-            println!("builtin: {:?}", builtin);
             if builtin.is_some() {
                 return Ok(builtin);
             }
