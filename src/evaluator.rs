@@ -129,7 +129,6 @@ fn eval_statement(statement: Statement, env: &mut Environment) -> EvalReturn {
 }
 
 fn apply_function(fun: Object, args: Vec<Object>) -> EvalReturn {
-    println!("apply_function: {:?} {:?}", fun, args);
     let fun = match fun {
         Object::Function(fun) => fun,
         Object::Builtin(fun) => return fun.apply(args),
