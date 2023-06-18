@@ -101,6 +101,7 @@ impl<'input_string_lifetime> Lexer<'input_string_lifetime> {
                 "(" => Token::LParen,
                 ")" => Token::RParen,
                 "," => Token::Comma,
+                ":" => Token::Colon,
                 "+" => Token::Plus,
                 "-" => Token::Minus,
                 "!" => {
@@ -179,6 +180,7 @@ mod test {
         \"foobar\"
         \"foo bar\"
         [1, 2]
+        {\"foo\": \"bar\"}
         ";
 
         let expected_tokens = [
@@ -262,6 +264,11 @@ mod test {
             Token::Comma,
             Token::Int("2".to_string()),
             Token::RBracket,
+            Token::LBrace,
+            Token::String("foo".to_string()),
+            Token::Colon,
+            Token::String("bar".to_string()),
+            Token::RBrace,
             Token::EOF,
         ];
 

@@ -16,6 +16,7 @@ pub enum Token {
     Lt,
     Gt,
     Comma,
+    Colon,
     SemiColon,
     LParen,
     RParen,
@@ -86,6 +87,7 @@ impl Token {
             Token::NotEq => "!=".to_string(),
             Token::LBracket => "[".to_string(),
             Token::RBracket => "]".to_string(),
+            Token::Colon => ":".to_string(),
         }
     }
 }
