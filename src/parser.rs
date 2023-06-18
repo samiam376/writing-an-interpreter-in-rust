@@ -148,6 +148,42 @@ impl<'lexer> Parser<'lexer> {
         Ok(left)
     }
 
+    fn parse_array_literal(&mut self) -> Result<Expression, String> {
+        let elements = self.parse_expression_list(Token::RBracket)?;
+        Ok(Expression::ArrayLiteral(elements))
+    }
+
+    fn parse_expression_list(&mut self, end: Token) -> Result<Vec<Expression>, String> {
+        let mut list = Vec::new();
+
+        if self.peek_token == Some(end.clone()) {
+            self.next_token();
+            return Ok(list);
+        };
+
+        self.next_token();
+
+        list.push(self.parse_expression(Precedence::Lowest)?);
+
+        while self.peek_token == Some(Token::Comma) {
+            self.next_token();
+            self.next_token();
+
+            list.push(self.parse_expression(Precedence::Lowest)?);
+        }
+
+        if self.peek_token != Some(end.clone()) {
+            return Err(format!(
+                "parse error: expected {:?}, got {:?}",
+                end, self.peek_token,
+            ));
+        };
+
+        self.next_token();
+
+        Ok(list)
+    }
+
     fn parse_function_parameters(&mut self) -> Result<Vec<Identifier>, String> {
         let mut identifiers = Vec::new();
 
@@ -252,6 +288,7 @@ impl<'lexer> Parser<'lexer> {
                 }
                 Token::If => self.parse_if_expression(),
                 Token::Function => self.parse_function_literal(),
+                Token::LBracket => self.parse_array_literal(),
                 _ => Err(format!(
                     "parse error: no parse function for prefix {:?}",
                     token
@@ -698,5 +735,35 @@ mod tests {
         let stmt = &program.statements[0];
 
         assert_eq!(stmt.to_string(), "add(1, (2 * 3), (4 + 5))");
+    }
+
+    #[test]
+    fn test_array_literal() {
+        let input = "[1, 2 * 2, 3 + 3]";
+
+        let lexer = Lexer::new(input);
+
+        let mut parser = Parser::new(lexer);
+
+        let program = parser
+            .parse_program()
+            .unwrap_or_else(|e| panic!("parse errors for test: {} \n Parse Error: {:?}", input, e));
+
+        assert_eq!(program.statements.len(), 1);
+
+        let stmt = &program.statements[0];
+
+        match stmt {
+            Statement::Expression(expr) => match expr {
+                Expression::ArrayLiteral(elements) => {
+                    assert_eq!(elements.len(), 3);
+                    assert_eq!(elements[0].to_string(), "1");
+                    assert_eq!(elements[1].to_string(), "(2 * 2)");
+                    assert_eq!(elements[2].to_string(), "(3 + 3)");
+                }
+                _ => panic!("stmt is not array literal"),
+            },
+            _ => panic!("stmt is not expression statement"),
+        }
     }
 }

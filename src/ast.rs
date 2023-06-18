@@ -75,6 +75,7 @@ pub enum Expression {
         function: Box<Expression>,
         arguments: Vec<Expression>,
     },
+    ArrayLiteral(Vec<Expression>),
 }
 
 impl Display for Expression {
@@ -136,6 +137,19 @@ impl Display for Expression {
                 write!(f, "{}", s)
             }
             Expression::String(s) => write!(f, "{}", s),
+            Expression::ArrayLiteral(a) => {
+                let mut s = String::new();
+                s.push('[');
+                let elements = a
+                    .iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<String>>()
+                    .join(",");
+
+                s.push_str(&elements);
+                s.push(']');
+                write!(f, "{}", s)
+            }
         }
     }
 }
