@@ -51,10 +51,13 @@ pub struct IfExpression {
     pub alternative: Option<Block>,
 }
 
+pub type HashLiteral = Vec<(Expression, Expression)>;
+
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Expression {
     Identifier(Identifier),
     Integer(i64),
+    String(String),
     Boolean(bool),
     Prefix {
         operator: Token,
@@ -74,6 +77,12 @@ pub enum Expression {
         function: Box<Expression>,
         arguments: Vec<Expression>,
     },
+    ArrayLiteral(Vec<Expression>),
+    Index {
+        left: Box<Expression>,
+        index: Box<Expression>,
+    },
+    HashLiteral(HashLiteral),
 }
 
 impl Display for Expression {
@@ -132,6 +141,43 @@ impl Display for Expression {
                     }
                 }
                 s.push(')');
+                write!(f, "{}", s)
+            }
+            Expression::String(s) => write!(f, "{}", s),
+            Expression::ArrayLiteral(a) => {
+                let mut s = String::new();
+                s.push('[');
+                let elements = a
+                    .iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<String>>()
+                    .join(",");
+
+                s.push_str(&elements);
+                s.push(']');
+                write!(f, "{}", s)
+            }
+            Expression::Index { left, index } => {
+                let mut s = String::new();
+                s.push('(');
+                s.push_str(&format!("{}", left));
+                s.push('[');
+                s.push_str(&format!("{}", index));
+                s.push(']');
+                s.push(')');
+                write!(f, "{}", s)
+            }
+            Expression::HashLiteral(h) => {
+                let mut s = String::new();
+                s.push('{');
+                let elements = h
+                    .iter()
+                    .map(|(k, v)| format!("{}: {}", k, v))
+                    .collect::<Vec<String>>()
+                    .join(",");
+
+                s.push_str(&elements);
+                s.push('}');
                 write!(f, "{}", s)
             }
         }

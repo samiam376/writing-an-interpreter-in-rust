@@ -48,6 +48,17 @@ impl<'input_string_lifetime> Lexer<'input_string_lifetime> {
         self.input[position..self.position].concat()
     }
 
+    fn read_string(&mut self) -> String {
+        let position = self.position + 1;
+        loop {
+            self.read_char();
+            if self.ch == Some("\"") || self.ch.is_none() {
+                break;
+            }
+        }
+        self.input[position..self.position].concat()
+    }
+
     fn read_ident(&mut self) -> String {
         let position = self.position;
         while self.ch.is_some() && is_letter(self.ch.unwrap()) {
@@ -77,6 +88,7 @@ impl<'input_string_lifetime> Lexer<'input_string_lifetime> {
         let token = match self.ch {
             None => Token::EOF,
             Some(c) => match c {
+                "\"" => Token::String(self.read_string()),
                 "=" => {
                     if self.peek_char() == Some("=") {
                         self.read_char();
@@ -89,6 +101,7 @@ impl<'input_string_lifetime> Lexer<'input_string_lifetime> {
                 "(" => Token::LParen,
                 ")" => Token::RParen,
                 "," => Token::Comma,
+                ":" => Token::Colon,
                 "+" => Token::Plus,
                 "-" => Token::Minus,
                 "!" => {
@@ -105,6 +118,8 @@ impl<'input_string_lifetime> Lexer<'input_string_lifetime> {
                 ">" => Token::Gt,
                 "{" => Token::LBrace,
                 "}" => Token::RBrace,
+                "[" => Token::LBracket,
+                "]" => Token::RBracket,
                 t => {
                     if is_letter(t) {
                         let ident = self.read_ident();
@@ -161,6 +176,11 @@ mod test {
 
         10 == 10;
         10 != 9;
+
+        \"foobar\"
+        \"foo bar\"
+        [1, 2]
+        {\"foo\": \"bar\"}
         ";
 
         let expected_tokens = [
@@ -237,6 +257,18 @@ mod test {
             Token::NotEq,
             Token::Int("9".to_string()),
             Token::SemiColon,
+            Token::String("foobar".to_string()),
+            Token::String("foo bar".to_string()),
+            Token::LBracket,
+            Token::Int("1".to_string()),
+            Token::Comma,
+            Token::Int("2".to_string()),
+            Token::RBracket,
+            Token::LBrace,
+            Token::String("foo".to_string()),
+            Token::Colon,
+            Token::String("bar".to_string()),
+            Token::RBrace,
             Token::EOF,
         ];
 

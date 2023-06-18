@@ -6,6 +6,7 @@ pub enum Token {
     EOF,
     Ident(String),
     Int(String),
+    String(String),
     Assign,
     Plus,
     Minus,
@@ -15,6 +16,7 @@ pub enum Token {
     Lt,
     Gt,
     Comma,
+    Colon,
     SemiColon,
     LParen,
     RParen,
@@ -29,6 +31,8 @@ pub enum Token {
     Return,
     Eq,
     NotEq,
+    LBracket,
+    RBracket,
 }
 
 impl Display for Token {
@@ -55,6 +59,7 @@ impl Token {
         match self {
             Token::Ident(ident) => ident.to_string(),
             Token::Int(int) => int.to_string(),
+            Token::String(string) => string.to_string(),
             Token::True => "true".to_string(),
             Token::False => "false".to_string(),
             Token::Illegal => "illegal".to_string(),
@@ -80,6 +85,9 @@ impl Token {
             Token::Return => "return".to_string(),
             Token::Eq => "==".to_string(),
             Token::NotEq => "!=".to_string(),
+            Token::LBracket => "[".to_string(),
+            Token::RBracket => "]".to_string(),
+            Token::Colon => ":".to_string(),
         }
     }
 }

@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 use crate::{
-    ast::{Block, Expression, IfExpression, Node, Program, Statement},
-    object::{Environment, Function, Object},
+    ast::{self, Block, Expression, IfExpression, Node, Program, Statement},
+    object::{Apply, Environment, Function, HashPair, Object},
     token::Token,
 };
 
-type EvalReturn = Result<Option<Object>, String>;
+pub type EvalReturn = Result<Option<Object>, String>;
 
 fn eval_bang(object: Object) -> EvalReturn {
     match object {
@@ -51,6 +53,13 @@ fn eval_infix_boolean(operator: Token, right: bool, left: bool) -> EvalReturn {
     }
 }
 
+fn eval_infix_string(operator: Token, right: String, left: String) -> EvalReturn {
+    match operator {
+        Token::Plus => Ok(Some(Object::String(left + &right))),
+        _ => Err(format!("unknown operator: {} {} {}", left, operator, right)),
+    }
+}
+
 fn eval_infix(operator: Token, right: Object, left: Object) -> EvalReturn {
     match (&left, &right) {
         (Object::Integer(left), Object::Integer(right)) => {
@@ -58,6 +67,9 @@ fn eval_infix(operator: Token, right: Object, left: Object) -> EvalReturn {
         }
         (Object::Boolean(left), Object::Boolean(right)) => {
             eval_infix_boolean(operator, *right, *left)
+        }
+        (Object::String(left), Object::String(right)) => {
+            eval_infix_string(operator, right.clone(), left.clone())
         }
         _ => Err(format!("unknown operator: {} {} {}", left, operator, right)),
     }
@@ -121,6 +133,7 @@ fn eval_statement(statement: Statement, env: &mut Environment) -> EvalReturn {
 fn apply_function(fun: Object, args: Vec<Object>) -> EvalReturn {
     let fun = match fun {
         Object::Function(fun) => fun,
+        Object::Builtin(fun) => return fun.apply(args),
         _ => panic!("not a function: {:?}", fun),
     };
 
@@ -138,10 +151,32 @@ fn apply_function(fun: Object, args: Vec<Object>) -> EvalReturn {
     }
 }
 
+fn eval_hash_literal(hash_literal: ast::HashLiteral, env: &mut Environment) -> EvalReturn {
+    let mut pairs = HashMap::new();
+
+    for (key_node, value_node) in hash_literal.iter() {
+        let key = eval_expression(key_node.clone(), env)?
+            .expect("key should be evaluated to an object, received none");
+
+        let hash_key = key.hash_key()?;
+
+        let value = eval_expression(value_node.clone(), env)?
+            .expect("value should be evaluated to an object, received none");
+
+        let hash_pair = HashPair { key, value };
+
+        pairs.insert(hash_key, hash_pair);
+    }
+
+    let object = Object::Hash(pairs);
+
+    Ok(Some(object))
+}
+
 fn eval_expression(expression: Expression, env: &mut Environment) -> EvalReturn {
     match expression {
-        Expression::Boolean(bool) => Ok(Some(Object::Boolean(bool))),
-        Expression::Integer(i) => Ok(Some(Object::Integer(i))),
+        Expression::Boolean(bool) => Ok(Some(bool.into())),
+        Expression::Integer(i) => Ok(Some(i.into())),
         Expression::Prefix { operator, right } => {
             let right = eval_expression(*right, env)?
                 .expect("prefix expression should be evaluated to an object");
@@ -162,10 +197,18 @@ fn eval_expression(expression: Expression, env: &mut Environment) -> EvalReturn 
         }
         Expression::If(ie) => eval_if_expression(ie, env),
         Expression::Identifier(ident) => {
-            let val = env
-                .get(&ident)
-                .ok_or_else(|| format!("identifier not found: {}", ident))?;
-            Ok(Some(val))
+            let val = env.get(&ident);
+
+            if val.is_some() {
+                return Ok(val);
+            };
+
+            let builtin = Object::lookup_builtin(&ident);
+            if builtin.is_some() {
+                return Ok(builtin);
+            }
+
+            Err(format!("identifier not found: {}", ident))
         }
         Expression::FunctionLiteral { parameters, body } => Ok(Some(Object::Function(
             Function::new(parameters, body, env.clone()),
@@ -191,6 +234,51 @@ fn eval_expression(expression: Expression, env: &mut Environment) -> EvalReturn 
 
             apply_function(function, args)
         }
+        Expression::String(s) => Ok(Some(s.into())),
+        Expression::ArrayLiteral(elements) => {
+            let elements = elements
+                .into_iter()
+                .map(|e| eval_expression(e, env))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            let flattened = elements.into_iter().flatten().collect();
+
+            Ok(Some(Object::Array(flattened)))
+        }
+        Expression::Index { left, index } => {
+            let left = eval_expression(*left, env)?
+                .expect("left side of index expression should be evaluated to an object");
+
+            let index = eval_expression(*index, env)?
+                .expect("index expression should be evaluated to an object");
+
+            match (left, index) {
+                (Object::Array(arr), Object::Integer(i)) => {
+                    let i = i as usize;
+                    if i >= arr.len() {
+                        return Err(format!(
+                            "index out of bounds: the len is {} but the index is {}",
+                            arr.len(),
+                            i
+                        ));
+                    }
+
+                    Ok(Some(arr[i].clone()))
+                }
+                (Object::Hash(pairs), object) => {
+                    let key = object.hash_key()?;
+                    let pair = pairs.get(&key);
+
+                    match pair {
+                        Some(pair) => Ok(Some(pair.value.clone())),
+                        None => Ok(Some(Object::Null)),
+                    }
+                }
+
+                _ => Err("index operator not supported".into()),
+            }
+        }
+        Expression::HashLiteral(hash) => eval_hash_literal(hash, env),
     }
 }
 
@@ -204,6 +292,8 @@ pub fn eval(node: Node, env: &mut Environment) -> EvalReturn {
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::{lexer::Lexer, parser::Parser};
 
@@ -363,5 +453,127 @@ mod test {
             ),
             Some(Object::Integer(4))
         );
+    }
+
+    #[test]
+    fn test_string() {
+        assert_eq!(
+            run_eval("\"Hello World!\""),
+            Some(Object::String("Hello World!".to_string()))
+        );
+        assert_eq!(
+            run_eval("\"Hello\" + \" \" + \"World!\""),
+            Some(Object::String("Hello World!".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_builtin() {
+        assert_eq!(
+            run_eval("len(\"\")"),
+            Some(Object::Integer("".len() as i64))
+        );
+        assert_eq!(
+            run_eval("len(\"four\")"),
+            Some(Object::Integer("four".len() as i64))
+        );
+    }
+
+    #[test]
+    fn test_array_literal() {
+        assert_eq!(
+            run_eval("[1, 2 * 2, 3 + 3]"),
+            Some(Object::Array(vec![
+                Object::Integer(1),
+                Object::Integer(4),
+                Object::Integer(6)
+            ]))
+        );
+    }
+
+    #[test]
+    fn test_hash_literal() {
+        let input = r#"
+        let two = "two";
+        {
+            "one": 10 - 9,
+            two: 1 + 1,
+            "thr" + "ee": 6 / 2,
+            4: 4,
+            true: 5,
+            false: 6
+        }
+        "#;
+
+        let evaluated = run_eval(input).unwrap();
+
+        match evaluated {
+            Object::Hash(pairs) => {
+                assert_eq!(pairs.len(), 6);
+
+                assert_eq!(
+                    pairs
+                        .get(&Object::String("one".to_string()).hash_key().unwrap())
+                        .unwrap()
+                        .value,
+                    Object::Integer(1)
+                );
+
+                assert_eq!(
+                    pairs
+                        .get(&Object::String("two".to_string()).hash_key().unwrap())
+                        .unwrap()
+                        .value,
+                    Object::Integer(2)
+                );
+
+                assert_eq!(
+                    pairs
+                        .get(&Object::String("three".to_string()).hash_key().unwrap())
+                        .unwrap()
+                        .value,
+                    Object::Integer(3)
+                );
+
+                assert_eq!(
+                    pairs
+                        .get(&Object::Integer(4).hash_key().unwrap())
+                        .unwrap()
+                        .value,
+                    Object::Integer(4)
+                );
+
+                assert_eq!(
+                    pairs
+                        .get(&Object::Boolean(true).hash_key().unwrap())
+                        .unwrap()
+                        .value,
+                    Object::Integer(5)
+                );
+
+                assert_eq!(
+                    pairs
+                        .get(&Object::Boolean(false).hash_key().unwrap())
+                        .unwrap()
+                        .value,
+                    Object::Integer(6)
+                );
+            }
+            _ => panic!("Expected hash object"),
+        }
+    }
+
+    #[test]
+    fn test_evaluate_hash_index() {
+        assert_eq!(run_eval("{\"foo\": 5}[\"foo\"]"), Some(Object::Integer(5)));
+        assert_eq!(run_eval("{\"foo\": 5}[\"bar\"]"), Some(Object::Null));
+        assert_eq!(
+            run_eval("let key = \"foo\"; {\"foo\": 5}[key]"),
+            Some(Object::Integer(5))
+        );
+        assert_eq!(run_eval("{}[\"foo\"]"), Some(Object::Null));
+        assert_eq!(run_eval("{5: 5}[5]"), Some(Object::Integer(5)));
+        assert_eq!(run_eval("{true: 5}[true]"), Some(Object::Integer(5)));
+        assert_eq!(run_eval("{false: 5}[false]"), Some(Object::Integer(5)));
     }
 }
