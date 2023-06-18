@@ -76,6 +76,10 @@ pub enum Expression {
         arguments: Vec<Expression>,
     },
     ArrayLiteral(Vec<Expression>),
+    Index {
+        left: Box<Expression>,
+        index: Box<Expression>,
+    },
 }
 
 impl Display for Expression {
@@ -148,6 +152,16 @@ impl Display for Expression {
 
                 s.push_str(&elements);
                 s.push(']');
+                write!(f, "{}", s)
+            }
+            Expression::Index { left, index } => {
+                let mut s = String::new();
+                s.push('(');
+                s.push_str(&format!("{}", left));
+                s.push('[');
+                s.push_str(&format!("{}", index));
+                s.push(']');
+                s.push(')');
                 write!(f, "{}", s)
             }
         }

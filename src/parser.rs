@@ -11,6 +11,7 @@ enum Precedence {
     Product,     // *
     Prefix,      // -X or !X
     Call,        // myFunction(X)
+    Index,       // array[index]
 }
 
 impl Precedence {
@@ -21,6 +22,7 @@ impl Precedence {
             Token::Plus | Token::Minus => Precedence::Sum,
             Token::Slash | Token::Asterisk => Precedence::Product,
             Token::LParen => Precedence::Call,
+            Token::LBracket => Precedence::Index,
             _ => Precedence::Lowest,
         }
     }
@@ -142,6 +144,10 @@ impl<'lexer> Parser<'lexer> {
                     self.next_token();
                     left = self.parse_call_expression(left.clone())?;
                 }
+                Some(Token::LBracket) => {
+                    self.next_token();
+                    left = self.parse_index_expression(left.clone())?;
+                }
                 _ => return Ok(left),
             }
         }
@@ -151,6 +157,25 @@ impl<'lexer> Parser<'lexer> {
     fn parse_array_literal(&mut self) -> Result<Expression, String> {
         let elements = self.parse_expression_list(Token::RBracket)?;
         Ok(Expression::ArrayLiteral(elements))
+    }
+
+    fn parse_index_expression(&mut self, left: Expression) -> Result<Expression, String> {
+        self.next_token();
+        let index = self.parse_expression(Precedence::Lowest)?;
+
+        if self.peek_token != Some(Token::RBracket) {
+            return Err(format!(
+                "parse error: expected {:?}, got {:?}",
+                Token::RBracket,
+                self.peek_token,
+            ));
+        };
+        self.next_token();
+
+        Ok(Expression::Index {
+            left: Box::new(left.clone()),
+            index: Box::new(index),
+        })
     }
 
     fn parse_expression_list(&mut self, end: Token) -> Result<Vec<Expression>, String> {
@@ -615,6 +640,14 @@ mod tests {
             ("2 / (5 + 5)", "(2 / (5 + 5))"),
             ("-(5 + 5)", "(-(5 + 5))"),
             ("!(true == true)", "(!(true == true))"),
+            (
+                "a * [1, 2, 3, 4][b * c] * d",
+                "((a * ([1, 2, 3, 4][(b * c)])) * d)",
+            ),
+            (
+                "add(a * b[2], b[1], 2 * [1, 2][1])",
+                "(add((a * (b[2])), (b[1]), (2 * ([1, 2][1]))))",
+            ),
         ];
 
         for (input, expected) in tests.iter() {
@@ -762,6 +795,34 @@ mod tests {
                     assert_eq!(elements[2].to_string(), "(3 + 3)");
                 }
                 _ => panic!("stmt is not array literal"),
+            },
+            _ => panic!("stmt is not expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_parse_index_expression() {
+        let input = "myArray[1 + 1]";
+
+        let lexer = Lexer::new(input);
+
+        let mut parser = Parser::new(lexer);
+
+        let program = parser
+            .parse_program()
+            .unwrap_or_else(|e| panic!("parse errors for test: {} \n Parse Error: {:?}", input, e));
+
+        assert_eq!(program.statements.len(), 1);
+
+        let stmt = &program.statements[0];
+
+        match stmt {
+            Statement::Expression(expr) => match expr {
+                Expression::Index { left, index } => {
+                    assert_eq!(left.to_string(), "myArray");
+                    assert_eq!(index.to_string(), "(1 + 1)");
+                }
+                _ => panic!("stmt is not index expression"),
             },
             _ => panic!("stmt is not expression statement"),
         }

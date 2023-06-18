@@ -214,6 +214,7 @@ fn eval_expression(expression: Expression, env: &mut Environment) -> EvalReturn 
         }
         Expression::String(s) => Ok(Some(s.into())),
         Expression::ArrayLiteral(_) => todo!(),
+        Expression::Index { left, index } => todo!(),
     }
 }
 
