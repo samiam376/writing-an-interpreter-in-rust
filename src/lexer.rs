@@ -48,6 +48,17 @@ impl<'input_string_lifetime> Lexer<'input_string_lifetime> {
         self.input[position..self.position].concat()
     }
 
+    fn read_string(&mut self) -> String {
+        let position = self.position + 1;
+        loop {
+            self.read_char();
+            if self.ch == Some("\"") || self.ch == None {
+                break;
+            }
+        }
+        self.input[position..self.position].concat()
+    }
+
     fn read_ident(&mut self) -> String {
         let position = self.position;
         while self.ch.is_some() && is_letter(self.ch.unwrap()) {
@@ -77,6 +88,7 @@ impl<'input_string_lifetime> Lexer<'input_string_lifetime> {
         let token = match self.ch {
             None => Token::EOF,
             Some(c) => match c {
+                "\"" => Token::String(self.read_string()),
                 "=" => {
                     if self.peek_char() == Some("=") {
                         self.read_char();
@@ -161,6 +173,9 @@ mod test {
 
         10 == 10;
         10 != 9;
+
+        \"foobar\"
+        \"foo bar\"
         ";
 
         let expected_tokens = [
@@ -237,6 +252,8 @@ mod test {
             Token::NotEq,
             Token::Int("9".to_string()),
             Token::SemiColon,
+            Token::String("foobar".to_string()),
+            Token::String("foo bar".to_string()),
             Token::EOF,
         ];
 

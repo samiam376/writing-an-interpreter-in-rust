@@ -6,6 +6,7 @@ pub enum Token {
     EOF,
     Ident(String),
     Int(String),
+    String(String),
     Assign,
     Plus,
     Minus,
@@ -55,6 +56,7 @@ impl Token {
         match self {
             Token::Ident(ident) => ident.to_string(),
             Token::Int(int) => int.to_string(),
+            Token::String(string) => string.to_string(),
             Token::True => "true".to_string(),
             Token::False => "false".to_string(),
             Token::Illegal => "illegal".to_string(),
