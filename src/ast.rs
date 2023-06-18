@@ -51,6 +51,8 @@ pub struct IfExpression {
     pub alternative: Option<Block>,
 }
 
+pub type HashLiteral = Vec<(Expression, Expression)>;
+
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Expression {
     Identifier(Identifier),
@@ -80,7 +82,7 @@ pub enum Expression {
         left: Box<Expression>,
         index: Box<Expression>,
     },
-    HashLiteral(Vec<(Expression, Expression)>),
+    HashLiteral(HashLiteral),
 }
 
 impl Display for Expression {

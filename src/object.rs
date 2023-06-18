@@ -178,7 +178,7 @@ pub enum Object {
     Function(Function),
     Builtin(BuiltInFunction),
     Array(Vec<Object>),
-    Hash { pairs: HashMap<HashKey, HashPair> },
+    Hash(HashMap<HashKey, HashPair>),
 }
 
 impl Object {
@@ -271,7 +271,7 @@ impl Display for Object {
                     .join(", ");
                 write!(f, "[{}]", elements)
             }
-            Object::Hash { pairs } => {
+            Object::Hash(pairs) => {
                 let elements = pairs
                     .iter()
                     .map(|(_k, v)| format!("{}: {}", v.key, v.value))

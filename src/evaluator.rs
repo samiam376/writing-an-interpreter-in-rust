@@ -1,6 +1,8 @@
+use std::collections::HashMap;
+
 use crate::{
-    ast::{Block, Expression, IfExpression, Node, Program, Statement},
-    object::{Apply, Environment, Function, Object},
+    ast::{self, Block, Expression, IfExpression, Node, Program, Statement},
+    object::{self, Apply, Environment, Function, HashKey, HashPair, Object},
     token::Token,
 };
 
@@ -149,6 +151,28 @@ fn apply_function(fun: Object, args: Vec<Object>) -> EvalReturn {
     }
 }
 
+fn eval_hash_literal(hash_literal: ast::HashLiteral, env: &mut Environment) -> EvalReturn {
+    let mut pairs = HashMap::new();
+
+    for (key_node, value_node) in hash_literal.iter() {
+        let key = eval_expression(key_node.clone(), env)?
+            .expect("key should be evaluated to an object, received none");
+
+        let hash_key = key.hash_key()?;
+
+        let value = eval_expression(value_node.clone(), env)?
+            .expect("value should be evaluated to an object, received none");
+
+        let hash_pair = HashPair { key, value };
+
+        pairs.insert(hash_key, hash_pair);
+    }
+
+    let object = Object::Hash(pairs);
+
+    Ok(Some(object))
+}
+
 fn eval_expression(expression: Expression, env: &mut Environment) -> EvalReturn {
     match expression {
         Expression::Boolean(bool) => Ok(Some(bool.into())),
@@ -244,7 +268,7 @@ fn eval_expression(expression: Expression, env: &mut Environment) -> EvalReturn 
                 _ => Err("index operator not supported".into()),
             }
         }
-        Expression::HashLiteral(_) => todo!(),
+        Expression::HashLiteral(hash) => eval_hash_literal(hash, env),
     }
 }
 
@@ -258,6 +282,8 @@ pub fn eval(node: Node, env: &mut Environment) -> EvalReturn {
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::{lexer::Lexer, parser::Parser};
 
@@ -453,5 +479,77 @@ mod test {
                 Object::Integer(6)
             ]))
         );
+    }
+
+    #[test]
+    fn test_hash_literal() {
+        let input = r#"
+        let two = "two";
+        {
+            "one": 10 - 9,
+            two: 1 + 1,
+            "thr" + "ee": 6 / 2,
+            4: 4,
+            true: 5,
+            false: 6
+        }
+        "#;
+
+        let evaluated = run_eval(input).unwrap();
+
+        match evaluated {
+            Object::Hash(pairs) => {
+                assert_eq!(pairs.len(), 6);
+
+                assert_eq!(
+                    pairs
+                        .get(&Object::String("one".to_string()).hash_key().unwrap())
+                        .unwrap()
+                        .value,
+                    Object::Integer(1)
+                );
+
+                assert_eq!(
+                    pairs
+                        .get(&Object::String("two".to_string()).hash_key().unwrap())
+                        .unwrap()
+                        .value,
+                    Object::Integer(2)
+                );
+
+                assert_eq!(
+                    pairs
+                        .get(&Object::String("three".to_string()).hash_key().unwrap())
+                        .unwrap()
+                        .value,
+                    Object::Integer(3)
+                );
+
+                assert_eq!(
+                    pairs
+                        .get(&Object::Integer(4).hash_key().unwrap())
+                        .unwrap()
+                        .value,
+                    Object::Integer(4)
+                );
+
+                assert_eq!(
+                    pairs
+                        .get(&Object::Boolean(true).hash_key().unwrap())
+                        .unwrap()
+                        .value,
+                    Object::Integer(5)
+                );
+
+                assert_eq!(
+                    pairs
+                        .get(&Object::Boolean(false).hash_key().unwrap())
+                        .unwrap()
+                        .value,
+                    Object::Integer(6)
+                );
+            }
+            _ => panic!("Expected hash object"),
+        }
     }
 }
