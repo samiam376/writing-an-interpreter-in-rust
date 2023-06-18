@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     ast::{self, Block, Expression, IfExpression, Node, Program, Statement},
-    object::{self, Apply, Environment, Function, HashKey, HashPair, Object},
+    object::{Apply, Environment, Function, HashPair, Object},
     token::Token,
 };
 
@@ -265,6 +265,16 @@ fn eval_expression(expression: Expression, env: &mut Environment) -> EvalReturn 
 
                     Ok(Some(arr[i].clone()))
                 }
+                (Object::Hash(pairs), object) => {
+                    let key = object.hash_key()?;
+                    let pair = pairs.get(&key);
+
+                    match pair {
+                        Some(pair) => Ok(Some(pair.value.clone())),
+                        None => Ok(Some(Object::Null)),
+                    }
+                }
+
                 _ => Err("index operator not supported".into()),
             }
         }
@@ -551,5 +561,19 @@ mod test {
             }
             _ => panic!("Expected hash object"),
         }
+    }
+
+    #[test]
+    fn test_evaluate_hash_index() {
+        assert_eq!(run_eval("{\"foo\": 5}[\"foo\"]"), Some(Object::Integer(5)));
+        assert_eq!(run_eval("{\"foo\": 5}[\"bar\"]"), Some(Object::Null));
+        assert_eq!(
+            run_eval("let key = \"foo\"; {\"foo\": 5}[key]"),
+            Some(Object::Integer(5))
+        );
+        assert_eq!(run_eval("{}[\"foo\"]"), Some(Object::Null));
+        assert_eq!(run_eval("{5: 5}[5]"), Some(Object::Integer(5)));
+        assert_eq!(run_eval("{true: 5}[true]"), Some(Object::Integer(5)));
+        assert_eq!(run_eval("{false: 5}[false]"), Some(Object::Integer(5)));
     }
 }

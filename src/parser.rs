@@ -154,9 +154,6 @@ impl<'lexer> Parser<'lexer> {
 
         self.next_token();
 
-        println!("cur_token 8: {:?}", self.cur_token);
-        println!("peek_token 8: {:?}", self.peek_token);
-
         Ok(Expression::HashLiteral(pairs))
     }
 
