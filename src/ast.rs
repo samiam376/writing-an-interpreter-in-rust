@@ -55,6 +55,7 @@ pub struct IfExpression {
 pub enum Expression {
     Identifier(Identifier),
     Integer(i64),
+    String(String),
     Boolean(bool),
     Prefix {
         operator: Token,
@@ -134,6 +135,7 @@ impl Display for Expression {
                 s.push(')');
                 write!(f, "{}", s)
             }
+            Expression::String(s) => write!(f, "{}", s),
         }
     }
 }

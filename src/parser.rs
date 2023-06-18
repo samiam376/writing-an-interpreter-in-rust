@@ -91,6 +91,13 @@ impl<'lexer> Parser<'lexer> {
         }
     }
 
+    fn parse_string_literal(&mut self) -> Result<Expression, String> {
+        match self.cur_token.clone() {
+            Some(Token::String(s)) => Ok(Expression::String(s)),
+            _ => Err("parse error: invalid token for string literal".to_string()),
+        }
+    }
+
     fn parse_boolean_literal(&mut self) -> Result<Expression, String> {
         match self.cur_token.clone() {
             Some(Token::True) => Ok(Expression::Boolean(true)),
@@ -232,6 +239,7 @@ impl<'lexer> Parser<'lexer> {
                     })
                 }
                 Token::Int(_) => self.parse_integer_literal(),
+                Token::String(_) => self.parse_string_literal(),
                 Token::True | Token::False => self.parse_boolean_literal(),
                 Token::LParen => {
                     self.next_token();

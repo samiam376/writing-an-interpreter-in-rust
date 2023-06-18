@@ -140,8 +140,8 @@ fn apply_function(fun: Object, args: Vec<Object>) -> EvalReturn {
 
 fn eval_expression(expression: Expression, env: &mut Environment) -> EvalReturn {
     match expression {
-        Expression::Boolean(bool) => Ok(Some(Object::Boolean(bool))),
-        Expression::Integer(i) => Ok(Some(Object::Integer(i))),
+        Expression::Boolean(bool) => Ok(Some(bool.into())),
+        Expression::Integer(i) => Ok(Some(i.into())),
         Expression::Prefix { operator, right } => {
             let right = eval_expression(*right, env)?
                 .expect("prefix expression should be evaluated to an object");
@@ -191,6 +191,7 @@ fn eval_expression(expression: Expression, env: &mut Environment) -> EvalReturn 
 
             apply_function(function, args)
         }
+        Expression::String(s) => Ok(Some(s.into())),
     }
 }
 
@@ -363,5 +364,17 @@ mod test {
             ),
             Some(Object::Integer(4))
         );
+    }
+
+    #[test]
+    fn test_string() {
+        assert_eq!(
+            run_eval("\"Hello World!\""),
+            Some(Object::String("Hello World!".to_string()))
+        );
+        // assert_eq!(
+        //     run_eval("\"Hello\" + \" \" + \"World!\""),
+        //     Some(Object::String("Hello World!".to_string()))
+        // );
     }
 }

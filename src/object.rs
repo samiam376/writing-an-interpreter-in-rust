@@ -5,6 +5,7 @@ use crate::ast::{Block, Identifier};
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Object {
     Integer(i64),
+    String(String),
     Boolean(bool),
     Null,
     ReturnValue(Box<Object>),
@@ -55,6 +56,12 @@ impl From<i64> for Object {
     }
 }
 
+impl From<String> for Object {
+    fn from(s: String) -> Self {
+        Object::String(s)
+    }
+}
+
 impl Display for Object {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -63,6 +70,7 @@ impl Display for Object {
             Object::Null => write!(f, "null"),
             Object::ReturnValue(obj) => write!(f, "{}", obj),
             Object::Function(fun) => write!(f, "{}", fun),
+            Object::String(s) => write!(f, "{}", s),
         }
     }
 }
