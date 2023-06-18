@@ -30,6 +30,8 @@ pub enum Token {
     Return,
     Eq,
     NotEq,
+    LBracket,
+    RBracket,
 }
 
 impl Display for Token {
@@ -82,6 +84,8 @@ impl Token {
             Token::Return => "return".to_string(),
             Token::Eq => "==".to_string(),
             Token::NotEq => "!=".to_string(),
+            Token::LBracket => "[".to_string(),
+            Token::RBracket => "]".to_string(),
         }
     }
 }

@@ -117,6 +117,8 @@ impl<'input_string_lifetime> Lexer<'input_string_lifetime> {
                 ">" => Token::Gt,
                 "{" => Token::LBrace,
                 "}" => Token::RBrace,
+                "[" => Token::LBracket,
+                "]" => Token::RBracket,
                 t => {
                     if is_letter(t) {
                         let ident = self.read_ident();
@@ -176,6 +178,7 @@ mod test {
 
         \"foobar\"
         \"foo bar\"
+        [1, 2]
         ";
 
         let expected_tokens = [
@@ -254,6 +257,11 @@ mod test {
             Token::SemiColon,
             Token::String("foobar".to_string()),
             Token::String("foo bar".to_string()),
+            Token::LBracket,
+            Token::Int("1".to_string()),
+            Token::Comma,
+            Token::Int("2".to_string()),
+            Token::RBracket,
             Token::EOF,
         ];
 
