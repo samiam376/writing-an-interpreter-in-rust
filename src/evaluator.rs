@@ -1,10 +1,10 @@
 use crate::{
     ast::{Block, Expression, IfExpression, Node, Program, Statement},
-    object::{Environment, Function, Object},
+    object::{Apply, Environment, Function, Object},
     token::Token,
 };
 
-type EvalReturn = Result<Option<Object>, String>;
+pub type EvalReturn = Result<Option<Object>, String>;
 
 fn eval_bang(object: Object) -> EvalReturn {
     match object {
@@ -129,8 +129,10 @@ fn eval_statement(statement: Statement, env: &mut Environment) -> EvalReturn {
 }
 
 fn apply_function(fun: Object, args: Vec<Object>) -> EvalReturn {
+    println!("apply_function: {:?} {:?}", fun, args);
     let fun = match fun {
         Object::Function(fun) => fun,
+        Object::Builtin(fun) => return fun.apply(args),
         _ => panic!("not a function: {:?}", fun),
     };
 
@@ -172,10 +174,19 @@ fn eval_expression(expression: Expression, env: &mut Environment) -> EvalReturn 
         }
         Expression::If(ie) => eval_if_expression(ie, env),
         Expression::Identifier(ident) => {
-            let val = env
-                .get(&ident)
-                .ok_or_else(|| format!("identifier not found: {}", ident))?;
-            Ok(Some(val))
+            let val = env.get(&ident);
+
+            if val.is_some() {
+                return Ok(val);
+            };
+
+            let builtin = Object::lookup_builtin(&ident);
+            println!("builtin: {:?}", builtin);
+            if builtin.is_some() {
+                return Ok(builtin);
+            }
+
+            Err(format!("identifier not found: {}", ident))
         }
         Expression::FunctionLiteral { parameters, body } => Ok(Some(Object::Function(
             Function::new(parameters, body, env.clone()),
@@ -385,6 +396,18 @@ mod test {
         assert_eq!(
             run_eval("\"Hello\" + \" \" + \"World!\""),
             Some(Object::String("Hello World!".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_builtin() {
+        assert_eq!(
+            run_eval("len(\"\")"),
+            Some(Object::Integer("".len() as i64))
+        );
+        assert_eq!(
+            run_eval("len(\"four\")"),
+            Some(Object::Integer("four".len() as i64))
         );
     }
 }

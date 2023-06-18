@@ -1,6 +1,44 @@
 use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
-use crate::ast::{Block, Identifier};
+use crate::{
+    ast::{Block, Identifier},
+    evaluator::EvalReturn,
+};
+pub trait Apply {
+    fn apply(&self, args: Vec<Object>) -> EvalReturn;
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum BuiltInFunction {
+    Len(Len),
+}
+
+impl Apply for BuiltInFunction {
+    fn apply(&self, args: Vec<Object>) -> EvalReturn {
+        match self {
+            BuiltInFunction::Len(len) => len.apply(args),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Len;
+
+impl Apply for Len {
+    fn apply(&self, args: Vec<Object>) -> EvalReturn {
+        if args.len() != 1 {
+            return Err(format!(
+                "wrong number of arguments. got={}, want=1",
+                args.len()
+            ));
+        };
+
+        match &args[0] {
+            Object::String(s) => Ok(Some(Object::Integer(s.len() as i64))),
+            _ => Err(format!("argument to `len` not supported, got={}", args[0])),
+        }
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Object {
@@ -10,9 +48,17 @@ pub enum Object {
     Null,
     ReturnValue(Box<Object>),
     Function(Function),
+    Builtin(BuiltInFunction),
 }
 
 impl Object {
+    pub fn lookup_builtin(input: &str) -> Option<Object> {
+        match input {
+            "len" => Some(Object::Builtin(BuiltInFunction::Len(Len))),
+            _ => None,
+        }
+    }
+
     pub fn is_truthy(&self) -> bool {
         match self {
             Object::Boolean(b) => *b,
@@ -20,9 +66,7 @@ impl Object {
             _ => true,
         }
     }
-}
 
-impl Object {
     pub fn is_integer(&self) -> bool {
         matches!(self, Object::Integer(_))
     }
@@ -71,6 +115,7 @@ impl Display for Object {
             Object::ReturnValue(obj) => write!(f, "{}", obj),
             Object::Function(fun) => write!(f, "{}", fun),
             Object::String(s) => write!(f, "{}", s),
+            Object::Builtin(b) => write!(f, "{:?}", b),
         }
     }
 }
